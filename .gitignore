@@ -35,5 +35,7 @@
 
 # Other
 .glzr/glazewm-autotile.py
+.glzr/glazewm/focus-lock.json
+.glzr/glazewm/focus-lock.stop
 .glzr/zebar/**/dist/
 .glzr/zebar/**/node_modules/
