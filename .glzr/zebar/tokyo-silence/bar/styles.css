@@ -44,6 +44,7 @@ body,
 
 /* Main bar layout */
 .bar {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -63,6 +64,10 @@ body,
 
 /* Center section */
 .center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,6 +80,17 @@ body,
   gap: 6px;
   flex: 1;
   justify-content: flex-end;
+}
+
+.focus-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: var(--bar-item-height);
+  color: #ff4d4f;
+  font-size: 14px;
 }
 
 /* Workspaces */
@@ -122,6 +138,9 @@ body,
 /* Date/Time */
 .datetime {
   color: var(--fg);
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
   font-weight: 500;
   line-height: 1;
   height: var(--bar-item-height);

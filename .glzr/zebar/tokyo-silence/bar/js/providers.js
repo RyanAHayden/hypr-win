@@ -6,7 +6,7 @@ import * as zebar from 'https://esm.sh/zebar@3.0';
  */
 export const providers = zebar.createProviderGroup({
   glazewm: { type: 'glazewm' },
-  date: { type: 'date', formatting: 'yyyy-MM-dd EEE HH:mm' },
+  date: { type: 'date', formatting: 'EEE MMM d h:mm:ss a' },
   cpu: { type: 'cpu' },
   memory: { type: 'memory' },
   battery: { type: 'battery' },

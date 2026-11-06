@@ -2,11 +2,15 @@ general:
   # Commands to run when the WM has started. This is useful for running a
   # script or launching another application.
   # Example: The below command launches Zebar.
-  startup_commands: ['shell-exec zebar']
+  startup_commands:
+    - 'shell-exec zebar'
+    - 'shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --service'
 
   # Commands to run just before the WM is shutdown.
   # Example: The below command kills Zebar.
-  shutdown_commands: ['shell-exec taskkill /IM zebar.exe /F']
+  shutdown_commands:
+    - 'shell-exec taskkill /IM zebar.exe /F'
+    - 'shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --stop'
 
   # Commands to run after the WM config is reloaded.
   config_reload_commands: []
@@ -248,6 +252,9 @@ keybindings:
   # Toggle the visibility of Zebar's bar windows.
   - commands: ['shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\toggle_zebar.ps1"']
     bindings: ['win+shift+space']
+
+  - commands: ['shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --toggle']
+    bindings: ['win+shift+o']
 
   # Change the focused window to be tiling.
   - commands: ['toggle-tiling']

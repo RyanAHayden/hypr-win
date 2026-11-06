@@ -302,6 +302,35 @@
        */
       function App() {
         const output = useProviderOutput(providers);
+        const [focusLocked, setFocusLocked] = useState(false);
+
+        useEffect(() => {
+          let disposed = false;
+          let timer;
+
+          const pollStatus = async () => {
+            try {
+              const response = await fetch('http://127.0.0.1:6125/status', {
+                method: 'POST',
+                cache: 'no-store',
+                signal: AbortSignal.timeout(1500),
+              });
+              if (!response.ok) throw new Error('Focus-lock status unavailable');
+              const status = await response.json();
+              if (!disposed) setFocusLocked(status.locked === true);
+            } catch {
+              if (!disposed) setFocusLocked(false);
+            } finally {
+              if (!disposed) timer = setTimeout(pollStatus, 500);
+            }
+          };
+
+          pollStatus();
+          return () => {
+            disposed = true;
+            clearTimeout(timer);
+          };
+        }, []);
 
         return (
           <div className="bar">
@@ -311,9 +340,12 @@
               <MediaSection media={output.media} />
             </div>
 
-            {/* Center: Date/Time */}
             <div className="center">
-              {output.date && <div className="datetime">{output.date.formatted}</div>}
+              {focusLocked && (
+                <span className="focus-lock" role="img" aria-label="Focus lock active" title="Focus lock active">
+                  {'\uf023'}
+                </span>
+              )}
             </div>
 
             {/* Right: System Info */}
@@ -324,6 +356,7 @@
                 battery={output.battery}
                 network={output.network}
               />
+              {output.date && <div className="datetime">{output.date.formatted}</div>}
             </div>
           </div>
         );
