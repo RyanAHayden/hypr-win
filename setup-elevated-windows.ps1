@@ -129,15 +129,18 @@ Start-ScheduledTask -TaskName 'Ryha hyprwin switcher'
 Write-Host "Registered and started task 'Ryha hyprwin switcher'."
 
 # Run-key apps wait for Explorer's startup delay and start in no set order; logon tasks start right away.
+# GlazeWM has uiAccess, so Task Scheduler can't start it directly; the task starts it through hyprwin.exe launch.
 foreach ($app in @(
-	@{ Name = 'GlazeWM'; Path = "$env:ProgramFiles\glzr.io\GlazeWM\glazewm.exe" },
+	@{ Name = 'GlazeWM'; Path = "$env:ProgramFiles\glzr.io\GlazeWM\glazewm.exe"; Launcher = $elevatedHyprwin },
 	@{ Name = 'AltSnap'; Path = "$env:APPDATA\AltSnap\AltSnap.exe" }
 )) {
 	if (-not (Test-Path $app.Path)) { continue }
+	$action = if ($app.Launcher) { New-ScheduledTaskAction -Execute $app.Launcher -Argument "launch `"$($app.Path)`"" }
+	else { New-ScheduledTaskAction -Execute $app.Path }
 	# Task priority 1 starts the app at high priority.
 	$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 1 `
 		-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-	Register-ScheduledTask -TaskName "Ryha $($app.Name)" -Action (New-ScheduledTaskAction -Execute $app.Path) `
+	Register-ScheduledTask -TaskName "Ryha $($app.Name)" -Action $action `
 		-Trigger (New-ScheduledTaskTrigger -AtLogOn -User $user) `
 		-Principal (New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited) `
 		-Settings $settings -Description "Starts $($app.Name) at logon." -Force | Out-Null

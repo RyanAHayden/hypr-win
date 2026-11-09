@@ -11,6 +11,7 @@
 //   hyprwin togglescratchpad  SUPER+S: go to workspace S; on S, go back to the previous workspace
 //   hyprwin togglezebar       SUPER+SHIFT+SPACE: show / hide the Zebar bar
 //   hyprwin focuslock         SUPER+SHIFT+O: toggle focus_lock.py's lock (stops focus following the cursor)
+//   hyprwin launch <file> [args]  start a program through the shell; the logon task starts GlazeWM with it
 //   hyprwin togglesplit       SUPER+\: flip the split between the focused window and its sibling (Hyprland's togglesplit)
 //   hyprwin fullscreen [max]  toggle fullscreen (or maximized), returning the window to its old spot
 //   hyprwin dwindle           stays running (GlazeWM startup): new windows split the focused one along its longer side
@@ -44,6 +45,12 @@ static class HyprWin
 		if (args.Length > 0 && args[0] == "switcher") return Switcher();
 		if (args.Length > 0 && args[0] == "togglezebar") { ToggleZebar(); return 0; }
 		if (args.Length > 0 && args[0] == "focuslock") { ToggleFocusLock(); return 0; }
+		// GlazeWM has uiAccess, which only the shell's launch path honours: started directly (as by Task Scheduler) it fails.
+		if (args.Length > 1 && args[0] == "launch")
+		{
+			Process.Start(new ProcessStartInfo(args[1], string.Join(" ", args, 2, args.Length - 2)) { UseShellExecute = true });
+			return 0;
+		}
 		try
 		{
 			Connect();
