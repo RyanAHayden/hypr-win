@@ -107,6 +107,16 @@ foreach ($exe in @{ 'glazewm.exe' = 3; 'AltSnap.exe' = 3; 'hyprwin.exe' = 3; 'ze
 }
 Write-Host 'Raised the CPU priority of GlazeWM, AltSnap, hyprwin, Zebar and Flow Launcher.'
 
+# A normal process's keyboard hook and keys don't reach elevated windows, so SUPER opened Start over them.
+# `hyprwin.exe switcher` (started by GlazeWM) hands over to this elevated copy.
+$switcherSettings = New-ScheduledTaskSettingsSet -MultipleInstances Parallel -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 1 `
+	-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskName 'Ryha hyprwin switcher' `
+	-Action (New-ScheduledTaskAction -Execute (Join-Path $env:USERPROFILE '.glzr\glazewm\hyprwin.exe') -Argument 'switcher') `
+	-Principal (New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest) `
+	-Settings $switcherSettings -Description 'Runs the hyprwin switcher elevated so its keys also work over elevated windows.' -Force | Out-Null
+Write-Host "Registered task 'Ryha hyprwin switcher'."
+
 # Run-key apps wait for Explorer's startup delay and start in no set order; logon tasks start right away.
 foreach ($app in @(
 	@{ Name = 'GlazeWM'; Path = "$env:ProgramFiles\glzr.io\GlazeWM\glazewm.exe" },

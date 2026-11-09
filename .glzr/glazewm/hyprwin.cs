@@ -193,21 +193,13 @@ static class HyprWin
 		if (children.Count == 2)
 		{
 			// Flipped, the split would tile the same way as its parent, which GlazeWM flattens: move the windows into the parent.
-			var grandparent = ParentOf((string)parent["id"]);
-			var siblings = new Dictionary<string, double>();
-			foreach (var c in TilingChildren(grandparent))
-				if (SoleWindow(c) != null) siblings[(string)SoleWindow(c)["id"]] = TilingSize(c);
 			double size = TilingSize(parent);
 			bool moveFirst = otherId == null && index < pair;
 			Command("--id " + (moveFirst ? firstId : secondId) + " move --direction " + (horizontal ? (moveFirst ? "up" : "down") : (moveFirst ? "left" : "right")));
 			if (otherId != null) Unwrap(firstId);
 			// Moving in took space from every window in the parent; give it back.
-			for (int round = 0; round < 3; round++)
-			{
-				if (firstId != null) Resize(firstId, size * firstShare, !horizontal);
-				if (secondId != null) Resize(secondId, size * secondShare, !horizontal);
-				foreach (var s in siblings) Resize(s.Key, s.Value, !horizontal);
-			}
+			if (otherId == null) Resize(id, size * (index < pair ? firstShare : secondShare), !horizontal);
+			else ResizePair(firstId, secondId, size * firstShare, size * secondShare, !horizontal);
 		}
 		else
 		{
@@ -245,12 +237,58 @@ static class HyprWin
 	{
 		var path = PathTo(id);
 		if (path == null) return;
-		int i = path.Count - 1;
-		while (i > 0 && Direction(path[i - 1]) != (horizontal ? "horizontal" : "vertical")) i--;
+		int i = AxisNode(path, horizontal);
 		if (i == 0) return;
 		double length = Convert.ToDouble(path[path.Count - 1][horizontal ? "width" : "height"]);
 		int delta = (int)Math.Round(length * (share / TilingSize(path[i]) - 1));
 		if (Math.Abs(delta) > 1) Command("--id " + id + " resize --" + (horizontal ? "width " : "height ") + (delta > 0 ? "+" : "") + delta + "px");
+	}
+
+	// The window's ancestor (or the window) whose parent tiles along the axis: what GlazeWM resizes along it.
+	static int AxisNode(List<Dictionary<string, object>> path, bool horizontal)
+	{
+		int i = path.Count - 1;
+		while (i > 0 && Direction(path[i - 1]) != (horizontal ? "horizontal" : "vertical")) i--;
+		return i;
+	}
+
+	// Resizing a container moves every sibling, the other window included, so one pass of two resizes can't land both.
+	// Simulate GlazeWM's resize to find the first size that leaves both on target once the second is resized.
+	static void ResizePair(string firstId, string secondId, double firstShare, double secondShare, bool horizontal)
+	{
+		var path = PathTo(firstId);
+		int node = path == null ? 0 : AxisNode(path, horizontal);
+		if (node == 0) return;
+		var siblings = TilingChildren(path[node - 1]);
+		var sizes = siblings.ConvertAll(TilingSize).ToArray();
+		int first = siblings.FindIndex(c => path[node]["id"].Equals(c["id"]));
+		int second = siblings.FindIndex(c => SoleWindow(c) != null && secondId.Equals(SoleWindow(c)["id"]));
+		double size = firstShare;
+		if (first >= 0 && second >= 0)
+		{
+			double low = MinTilingSize, high = 1;
+			for (int n = 0; n < 40; n++)
+			{
+				size = (low + high) / 2;
+				if (SimulateResize(SimulateResize(sizes, first, size), second, secondShare)[first] < firstShare) low = size;
+				else high = size;
+			}
+		}
+		Resize(firstId, size, horizontal);
+		Resize(secondId, secondShare, horizontal);
+	}
+
+	// GlazeWM's resize_tiling_container: siblings give up the change in proportion to their size above the minimum.
+	const double MinTilingSize = 0.01;
+	static double[] SimulateResize(double[] sizes, int index, double target)
+	{
+		var result = (double[])sizes.Clone();
+		target = Math.Max(MinTilingSize, Math.Min(target, 1 - MinTilingSize * (sizes.Length - 1)));
+		double delta = target - sizes[index], available = 0;
+		for (int k = 0; k < sizes.Length; k++) if (k != index) available += sizes[k] - MinTilingSize;
+		for (int k = 0; k < sizes.Length; k++) if (k != index) result[k] -= delta * (sizes[k] - MinTilingSize) / available;
+		result[index] = target;
+		return result;
 	}
 
 	static string Direction(Dictionary<string, object> container)
@@ -350,6 +388,22 @@ static class HyprWin
 
 	static System.Threading.Mutex instance;
 
+	static bool IsElevated()
+	{
+		return new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
+			.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+	}
+
+	static bool RunTask(string name)
+	{
+		try
+		{
+			var info = new ProcessStartInfo("schtasks.exe", "/run /tn \"" + name + "\"") { CreateNoWindow = true, UseShellExecute = false };
+			using (var process = Process.Start(info)) return process.WaitForExit(5000) && process.ExitCode == 0;
+		}
+		catch (Exception) { return false; }
+	}
+
 	// Replace a running instance (e.g. after a rebuild): signal it to exit, then take over.
 	static bool TakeOver(string name)
 	{
@@ -401,6 +455,9 @@ static class HyprWin
 
 	static int Switcher()
 	{
+		// A normal process's hook and keys don't reach elevated windows (so SUPER opened Start over them): hand over to the
+		// elevated copy setup-elevated-windows.ps1 registers, if there is one.
+		if (!IsElevated() && RunTask("Ryha hyprwin switcher")) return 0;
 		if (!TakeOver("hyprwin-switcher")) return 1;
 
 		// GlazeWM commands from the hook run here, on one connection kept open (reconnecting if GlazeWM restarted).
