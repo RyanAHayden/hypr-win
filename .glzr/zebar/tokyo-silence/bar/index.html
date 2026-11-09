@@ -207,7 +207,7 @@
       // ============================================================================
 
       /**
-       * GlazeWM workspaces and tiling direction controls
+       * GlazeWM workspaces
        */
       function WorkspacesSection({ glazewm }) {
         if (!glazewm) return null;
@@ -227,10 +227,6 @@
             </div>
 
             {glazewm.isPaused && <div className="chip paused">PAUSED</div>}
-
-            <button className="chip tiling" onClick={() => glazewm.runCommand('toggle-tiling-direction')}>
-              <span className="icon">{glazewm.tilingDirection === 'horizontal' ? '󰯍' : '󰯎'}</span>
-            </button>
           </>
         );
       }

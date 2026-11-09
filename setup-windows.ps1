@@ -79,8 +79,9 @@ if (Test-Path $hyprwin) { Move-Item $hyprwin "$hyprwin.old" -Force -ErrorAction 
 if ($LASTEXITCODE) {
 	Write-Host '  Build failed; the SUPER+Tab switcher, Alt+Tab cycle, SUPER+Q and scratchpad binds need it.'
 } elseif (Get-Command glazewm -ErrorAction SilentlyContinue) {
-	# Restart the switcher through GlazeWM so it runs elevated like GlazeWM (the new one replaces the old).
+	# Restart the switcher and dwindle through GlazeWM so they run elevated like GlazeWM (the new ones replace the old).
 	glazewm command shell-exec --hide-window '%USERPROFILE%\.glzr\glazewm\hyprwin.exe' switcher 2>$null | Out-Null
+	glazewm command shell-exec --hide-window '%USERPROFILE%\.glzr\glazewm\hyprwin.exe' dwindle 2>$null | Out-Null
 }
 
 Write-Host 'Installing PSFzf for PowerShell 7...'

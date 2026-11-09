@@ -8,6 +8,8 @@ general:
     - 'shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\Microsoft\PowerToys\Keyboard Manager\toggle_keyboard_layout.ps1" -Action reload'
     # SUPER+Tab window switcher (Tab / Shift / HJKL / Q while holding SUPER).
     - 'shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe switcher'
+    # Hyprland-style dwindle tiling.
+    - 'shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe dwindle'
 
   # Commands to run just before the WM is shutdown.
   # Example: The below command kills Zebar.
@@ -238,10 +240,9 @@ keybindings:
   - commands: ['wm-toggle-pause']
     bindings: ['win+shift+p']
 
-  # Change tiling direction. This determines where new tiling windows will
-  # be inserted.
-  - commands: ['toggle-tiling-direction']
-    bindings: ['win+backslash']
+  # Flip the split between the focused window and its sibling.
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglesplit']
+    bindings: ['win+oem_pipe']
 
   # Change focus from tiling windows -> floating -> fullscreen.
   # - commands: ['wm-cycle-focus']

@@ -8,9 +8,12 @@
 //   hyprwin kill              SUPER+SHIFT+W: force kill the focused window's app
 //   hyprwin unminimize        SUPER+ALT+M: restore a minimized window, preferring one from this workspace
 //   hyprwin scratchpad        SUPER+ALT+S: send the focused window to workspace S; on S, send it back
+//   hyprwin togglesplit       SUPER+\: flip the split between the focused window and its sibling (Hyprland's togglesplit)
+//   hyprwin dwindle           stays running (GlazeWM startup): new windows split the focused one along its longer side
 //   hyprwin switcher          stays running (GlazeWM startup): SUPER+Tab window switcher; see the Switcher section.
 //                             It also stops SUPER alone opening Start; tapping SUPER+Alt opens it instead.
-//                             Starting it again replaces the running one.
+//                             SUPER+C / SUPER+V copy / paste everywhere; SUPER+Ctrl+V opens clipboard history.
+//                             Starting either again replaces the running one.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -45,6 +48,8 @@ static class HyprWin
 				case "kill": Quit(true); break;
 				case "unminimize": Unminimize(); break;
 				case "scratchpad": Scratchpad(); break;
+				case "togglesplit": ToggleSplit(); break;
+				case "dwindle": return Dwindle();
 				default: return 2;
 			}
 			return 0;
@@ -99,6 +104,181 @@ static class HyprWin
 		Command(workspace != null && (string)workspace["name"] == "S" ? "move --recent-workspace" : "move --workspace S");
 	}
 
+	static void ToggleSplit()
+	{
+		var focused = Map(Map(Query("focused"))["focused"]);
+		if (focused == null || (string)focused["type"] != "window" || State(focused) != "tiling") return;
+		var id = (string)focused["id"];
+		var parent = Unwrap(id);
+		if (parent == null) return;
+		var children = TilingChildren(parent);
+		if (children.Count < 2) return;
+		if ((string)parent["type"] == "workspace" && children.Count == 2)
+		{
+			Command("--id " + parent["id"] + " toggle-tiling-direction");
+			Command("wm-redraw");
+			return;
+		}
+		int index = children.FindIndex(c => id.Equals(c["id"]));
+		bool horizontal = (string)parent["tilingDirection"] == "horizontal";
+		// GlazeWM flattens a split into a parent that tiles the same way, so the window's pair is the neighbour closest in size.
+		int pair = -1;
+		foreach (int i in new[] { index - 1, index + 1 })
+			if (i >= 0 && i < children.Count
+				&& (pair < 0 || Math.Abs(TilingSize(children[i]) - TilingSize(children[index])) < Math.Abs(TilingSize(children[pair]) - TilingSize(children[index]))))
+				pair = i;
+		var other = SoleWindow(children[pair]);
+		// GlazeWM can't move a group of windows, so it can't be wrapped together with this window.
+		if (other == null && children.Count > 2) return;
+		string otherId = other == null ? null : (string)other["id"];
+		string firstId = index < pair ? id : otherId, secondId = index < pair ? otherId : id;
+		double firstShare = TilingSize(children[Math.Min(index, pair)]), secondShare = TilingSize(children[Math.Max(index, pair)]);
+		if (otherId != null) Unwrap(otherId);
+		if (children.Count == 2)
+		{
+			// Flipped, the split would tile the same way as its parent, which GlazeWM flattens: move the windows into the parent.
+			var grandparent = ParentOf((string)parent["id"]);
+			var siblings = new Dictionary<string, double>();
+			foreach (var c in TilingChildren(grandparent))
+				if (SoleWindow(c) != null) siblings[(string)SoleWindow(c)["id"]] = TilingSize(c);
+			double size = TilingSize(parent);
+			bool moveFirst = otherId == null && index < pair;
+			Command("--id " + (moveFirst ? firstId : secondId) + " move --direction " + (horizontal ? (moveFirst ? "up" : "down") : (moveFirst ? "left" : "right")));
+			if (otherId != null) Unwrap(firstId);
+			// Moving in took space from every window in the parent; give it back.
+			for (int round = 0; round < 3; round++)
+			{
+				if (firstId != null) Resize(firstId, size * firstShare, !horizontal);
+				if (secondId != null) Resize(secondId, size * secondShare, !horizontal);
+				foreach (var s in siblings) Resize(s.Key, s.Value, !horizontal);
+			}
+		}
+		else
+		{
+			// GlazeWM can't flip a split: wrap the first window in a split running the other way, then move the second into it.
+			Command("--id " + firstId + " toggle-tiling-direction");
+			Command("--id " + secondId + " move --direction " + (horizontal ? "left" : "up"));
+			Resize(id, firstShare + secondShare, horizontal);
+		}
+		Command("focus --container-id " + id);
+	}
+
+	// Resize the window's container that tiles along the given axis to a share of its parent.
+	static void Resize(string id, double share, bool horizontal)
+	{
+		var path = PathTo(id);
+		if (path == null) return;
+		int i = path.Count - 1;
+		while (i > 0 && Direction(path[i - 1]) != (horizontal ? "horizontal" : "vertical")) i--;
+		if (i == 0) return;
+		double length = Convert.ToDouble(path[path.Count - 1][horizontal ? "width" : "height"]);
+		int delta = (int)Math.Round(length * (share / TilingSize(path[i]) - 1));
+		if (Math.Abs(delta) > 1) Command("--id " + id + " resize --" + (horizontal ? "width " : "height ") + (delta > 0 ? "+" : "") + delta + "px");
+	}
+
+	static string Direction(Dictionary<string, object> container)
+	{
+		object direction;
+		container.TryGetValue("tilingDirection", out direction);
+		return direction as string;
+	}
+
+	// Dwindle leaves windows wrapped in single-window splits; toggling an only child flattens its split.
+	static Dictionary<string, object> Unwrap(string id)
+	{
+		for (int i = 0; i < 10; i++)
+		{
+			var parent = ParentOf(id);
+			if (parent == null || (string)parent["type"] != "split" || TilingChildren(parent).Count != 1) return parent;
+			Command("--id " + id + " toggle-tiling-direction");
+		}
+		return null;
+	}
+
+	static Dictionary<string, object> SoleWindow(Dictionary<string, object> container)
+	{
+		while ((string)container["type"] == "split")
+		{
+			var children = TilingChildren(container);
+			if (children.Count != 1) return null;
+			container = children[0];
+		}
+		return container;
+	}
+
+	static double TilingSize(Dictionary<string, object> container) { return Convert.ToDouble(container["tilingSize"]); }
+
+	static List<Dictionary<string, object>> TilingChildren(Dictionary<string, object> container)
+	{
+		var children = new List<Dictionary<string, object>>();
+		foreach (var c in List(container["children"]))
+		{
+			var type = (string)Map(c)["type"];
+			if (type == "split" || (type == "window" && State(Map(c)) == "tiling")) children.Add(Map(c));
+		}
+		return children;
+	}
+
+	static Dictionary<string, object> ParentOf(string id)
+	{
+		var path = PathTo(id);
+		return path != null && path.Count > 1 ? path[path.Count - 2] : null;
+	}
+
+	// The containers from the workspace down to the given one.
+	static List<Dictionary<string, object>> PathTo(string id)
+	{
+		foreach (var w in List(Map(Query("workspaces"))["workspaces"]))
+		{
+			var path = new List<Dictionary<string, object>>();
+			if (FindPath(Map(w), id, path)) return path;
+		}
+		return null;
+	}
+
+	static bool FindPath(Dictionary<string, object> container, string id, List<Dictionary<string, object>> path)
+	{
+		path.Add(container);
+		if (id.Equals(container["id"])) return true;
+		object children;
+		container.TryGetValue("children", out children);
+		foreach (var c in List(children))
+			if (FindPath(Map(c), id, path)) return true;
+		path.RemoveAt(path.Count - 1);
+		return false;
+	}
+
+	// --- Dwindle: like Hyprland's dwindle layout, the next window splits the focused one along its longer side ---
+
+	static int Dwindle()
+	{
+		if (!TakeOver("hyprwin-dwindle")) return 1;
+		Send("sub --events focus_changed window_managed window_unmanaged");
+		while (true)
+		{
+			if (!Receive().Contains("\"event_subscription\"")) continue;
+			var focused = Map(Map(Query("focused"))["focused"]);
+			if (focused == null || (string)focused["type"] != "window" || State(focused) != "tiling") continue;
+			bool wide = Convert.ToDouble(focused["width"]) >= Convert.ToDouble(focused["height"]);
+			Command("--id " + focused["id"] + " set-tiling-direction " + (wide ? "horizontal" : "vertical"));
+		}
+	}
+
+	static System.Threading.Mutex instance;
+
+	// Replace a running instance (e.g. after a rebuild): signal it to exit, then take over.
+	static bool TakeOver(string name)
+	{
+		var quit = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, name + "-quit");
+		instance = new System.Threading.Mutex(false, name);
+		quit.Set();
+		try { if (!instance.WaitOne(3000)) return false; }
+		catch (System.Threading.AbandonedMutexException) { }
+		quit.Reset();
+		new System.Threading.Thread(() => { quit.WaitOne(); Environment.Exit(0); }) { IsBackground = true }.Start();
+		return true;
+	}
+
 	// --- Switcher: SUPER+Tab, hypr-mac style ---
 	// Holding SUPER, Tab opens the Windows Alt+Tab switcher (sent as Alt+Tab) and moves forward; tapping Shift, or Shift+Tab,
 	// moves back; H/J/K/L move left/down/up/right; Q closes the highlighted window. Releasing SUPER picks the window.
@@ -118,7 +298,8 @@ static class HyprWin
 	[StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam, lParam; public uint time; public int x, y; }
 
 	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
-	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51;
+	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_INSERT = 0x2D;
+	const int VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3;
 	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_MENU = 0x12, VK_LMENU = 0xA4, VK_RMENU = 0xA5, VK_DUMMY = 0xFF;
 	const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2, WM_APP = 0x8000, WM_MODIFIER_DOWN = WM_APP + 1;
 	const uint WM_SYSCOMMAND = 0x0112, SC_TASKLIST = 0xF130;
@@ -130,18 +311,11 @@ static class HyprWin
 	static uint mainThread;
 	static bool active, shiftTap, shiftTapUsed;
 	static bool chordHeld, chordClean;
-	static int keySeq;
+	static int keySeq, clipboardKey;
 
 	static int Switcher()
 	{
-		// Replace a running instance (e.g. after a rebuild): signal it to exit, then take over.
-		var quit = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, "hyprwin-switcher-quit");
-		var single = new System.Threading.Mutex(false, "hyprwin-switcher");
-		quit.Set();
-		try { if (!single.WaitOne(3000)) return 1; }
-		catch (System.Threading.AbandonedMutexException) { }
-		quit.Reset();
-		new System.Threading.Thread(() => { quit.WaitOne(); Environment.Exit(0); }) { IsBackground = true }.Start();
+		if (!TakeOver("hyprwin-switcher")) return 1;
 
 		mainThread = GetCurrentThreadId();
 		Hook();
@@ -173,8 +347,9 @@ static class HyprWin
 		if (code < 0 || Marshal.ReadInt64(data, 16) == OurFlag) return CallNextHookEx(IntPtr.Zero, code, message, data);
 		int vk = Marshal.ReadInt32(data);
 		bool up = (Marshal.ReadInt32(data, 8) & 0x80) != 0;
-		bool swallow = active ? WhileOpen(vk, up) : vk == VK_TAB && !up && SuperHeld() && Open();
-		if (!active && !swallow) StartMenuKey(vk, up);
+		bool wasActive = active;
+		bool swallow = active ? WhileOpen(vk, up) : (vk == VK_TAB && !up && SuperHeld() && Open()) || ClipboardKey(vk, up);
+		if (!wasActive && !active) StartMenuKey(vk, up);
 		return swallow ? (IntPtr)1 : CallNextHookEx(IntPtr.Zero, code, message, data);
 	}
 
@@ -195,6 +370,35 @@ static class HyprWin
 		if (chordHeld && chordClean) PostMessage(FindWindow("Shell_TrayWnd", null), WM_SYSCOMMAND, (IntPtr)SC_TASKLIST, IntPtr.Zero);
 		chordHeld = false;
 		if (SuperHeld()) Tap(VK_DUMMY);
+	}
+
+	// SUPER+C / SUPER+V send Ctrl+Insert / Shift+Insert (copy / paste in terminals too) with Win briefly let go.
+	// SUPER+Ctrl+V sends Win+V (clipboard history), then lets Win go so its release can't close the history.
+	static bool ClipboardKey(int vk, bool up)
+	{
+		if (vk == clipboardKey) { if (up) clipboardKey = 0; return true; }
+		if (up || (vk != VK_C && vk != VK_V) || !SuperHeld()) return false;
+		bool ctrl = GetAsyncKeyState(VK_CONTROL) < 0;
+		if (ctrl && vk == VK_C) return false;
+		clipboardKey = vk;
+		bool lwin = GetAsyncKeyState(VK_LWIN) < 0, rwin = GetAsyncKeyState(VK_RWIN) < 0;
+		if (ctrl)
+		{
+			if (GetAsyncKeyState(VK_LCONTROL) < 0) Key(VK_LCONTROL, true);
+			if (GetAsyncKeyState(VK_RCONTROL) < 0) Key(VK_RCONTROL, true);
+			Tap(VK_V);
+			if (lwin) Key(VK_LWIN, true);
+			if (rwin) Key(VK_RWIN, true);
+			return true;
+		}
+		Key(VK_DUMMY, false); Key(VK_DUMMY, true);
+		if (lwin) Key(VK_LWIN, true);
+		if (rwin) Key(VK_RWIN, true);
+		int modifier = vk == VK_C ? VK_LCONTROL : VK_LSHIFT;
+		Key(modifier, false); Tap(VK_INSERT, true); Key(modifier, true);
+		if (lwin) Key(VK_LWIN, false);
+		if (rwin) Key(VK_RWIN, false);
+		return true;
 	}
 
 	static bool Open()

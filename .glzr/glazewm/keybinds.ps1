@@ -5,7 +5,7 @@
 $env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH', 'User')
 
 $config = Join-Path $PSScriptRoot 'config.yaml'
-$keyNames = @{ win = 'SUPER'; left = '←'; right = '→'; up = '↑'; down = '↓'; enter = 'ENTER'; backslash = '\'; space = 'SPACE'; escape = 'ESC'; oem_question = '/'; f13 = 'ALT + TAB'; f14 = 'ALT + SHIFT + TAB' }
+$keyNames = @{ win = 'SUPER'; left = '←'; right = '→'; up = '↑'; down = '↓'; enter = 'ENTER'; oem_pipe = '\'; space = 'SPACE'; escape = 'ESC'; oem_question = '/'; f13 = 'ALT + TAB'; f14 = 'ALT + SHIFT + TAB' }
 
 function Format-Keys($binding) {
 	($binding -split '\+' | ForEach-Object { if ($keyNames[$_]) { $keyNames[$_] } else { $_.ToUpper() } }) -join ' + '

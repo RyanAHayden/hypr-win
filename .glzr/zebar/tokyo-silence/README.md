@@ -7,7 +7,7 @@ Tokyo Silence is a theme inspired by the quiet stillness of Tokyo Night.
 ## Features
 
 - Thin, low-contrast bar designed to stay out of the way.
-- GlazeWM workspaces and tiling direction indicator.
+- GlazeWM workspaces.
 - Media title marquee with hover-only scroll and pause-aware behavior.
 - CPU/Mem/Battery/Network indicators.
 
