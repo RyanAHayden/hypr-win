@@ -1,0 +1,34 @@
+# Linux starship.toml, cyan swapped for white (ANSI 7, the theme's foreground)
+add_newline = true
+command_timeout = 200
+format = "[$directory$git_branch$git_status]($style)$character"
+
+[character]
+error_symbol = "[✗](bold white)"
+success_symbol = "[❯](bold white)"
+
+[directory]
+style = "bold white"
+truncation_length = 2
+truncation_symbol = "…/"
+repo_root_style = "bold white"
+repo_root_format = "[$repo_root]($repo_root_style)[$path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+format = "[$branch]($style) "
+style = "italic white"
+
+[git_status]
+format     = '[$all_status]($style)'
+style      = "white"
+ahead      = "⇡${count} "
+diverged   = "⇕⇡${ahead_count}⇣${behind_count} "
+behind     = "⇣${count} "
+conflicted = " "
+up_to_date = " "
+untracked  = "? "
+modified   = " "
+stashed    = ""
+staged     = ""
+renamed    = ""
+deleted    = ""

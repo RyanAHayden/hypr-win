@@ -1,0 +1,47 @@
+# config
+/.config/*
+
+*.log
+*.old
+
+# Windhawk
+/Windhawk/Engine
+/Windhawk/ModsSource
+/Windhawk/UIData/
+!/Windhawk/UIData/user-data/User/settings.json
+
+# FlowLauncher
+/FlowLauncher/Cache
+/FlowLauncher/Logs
+/FlowLauncher/Plugins
+/FlowLauncher/Settings/*
+!/FlowLauncher/Settings/Settings.json
+
+# PowerToys
+/PowerToys/*
+!/PowerToys/settings.json
+!/PowerToys/Keyboard Manager/
+/PowerToys/Keyboard Manager/*
+!/PowerToys/Keyboard Manager/default.json
+!/PowerToys/Keyboard Manager/editorSettings.json
+!/PowerToys/Keyboard Manager/settings.json
+!/PowerToys/Keyboard Manager/layout_default.json
+!/PowerToys/Keyboard Manager/layout_remapped.json
+!/PowerToys/Keyboard Manager/toggle_keyboard_layout.ps1
+!/PowerToys/Keyboard Manager/toggle_keyboard_layout.bat
+!/PowerToys/Keyboard Manager/ctrl_caps_lock.py
+
+# Backup files
+*.bak
+
+# Other
+.glzr/glazewm-autotile.py
+.glzr/glazewm/focus-lock.json
+.glzr/glazewm/focus-lock.stop
+.glzr/zebar/**/dist/
+.glzr/zebar/**/node_modules/
+
+# Dotter machine-local state
+.dotter/local.toml
+.dotter/cache.toml
+.dotter/cache/
