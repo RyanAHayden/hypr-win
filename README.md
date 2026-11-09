@@ -6,6 +6,21 @@ Mostly for personal reasons but feel free to mess around with the configs.
 
 Install what you want manually or use the included `installs.bat`
 
+# Linking configs with Dotter (Stow-style)
+[Dotter](https://github.com/SuperCuber/dotter) symlinks repo files into place, so edits in either location are the same file. The copy scripts still work as a fallback.
+
+1. Enable Developer Mode (Settings > System > For developers), otherwise Dotter copies instead of linking.
+2. `winget install SuperCuber.Dotter`
+3. Run `copy_from_user_folder.bat` once and commit anything you want to keep, since the first deploy replaces the live files.
+4. Create `.dotter/local.toml` (not tracked) choosing packages from `.dotter/global.toml`:
+   ```toml
+   packages = ["glazewm", "zebar", "flowlauncher", "powertoys", "altsnap"]
+   ```
+   Add `"zebar_ryha"` after `npm --prefix .glzr/zebar/ryha run build`.
+5. From the repo root: `dotter deploy --dry-run`, then `dotter deploy --force` the first time and `dotter deploy` after.
+
+`dotter undeploy` removes the links. Some apps rewrite settings by replacing the file, which breaks the link; `dotter deploy` reports those.
+
 # Install
 
 ## < [Nerd Font](https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip) > (Required for icons)

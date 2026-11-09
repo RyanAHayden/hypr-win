@@ -39,3 +39,8 @@
 .glzr/glazewm/focus-lock.stop
 .glzr/zebar/**/dist/
 .glzr/zebar/**/node_modules/
+
+# Dotter machine-local state
+.dotter/local.toml
+.dotter/cache.toml
+.dotter/cache/
