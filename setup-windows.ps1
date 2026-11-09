@@ -18,6 +18,9 @@ Set-Reg 'HKCU:\Control Panel\Accessibility\StickyKeys' Flags '506' String
 Set-Reg 'HKCU:\Control Panel\Accessibility\Keyboard Response' Flags '122' String
 Set-Reg 'HKCU:\Control Panel\Accessibility\ToggleKeys' Flags '58' String
 
+Write-Host 'Freeing SUPER+S from Windows Search (GlazeWM scratchpad)...'
+Set-Reg "$explorer\Advanced" DisabledHotkeys 'S' String
+
 Write-Host 'Turning off Snap, window arrangement and animations (GlazeWM tiles instead)...'
 Set-Reg "$explorer\Advanced" SnapAssist 0
 Set-Reg "$explorer\Advanced" EnableSnapAssistFlyout 0

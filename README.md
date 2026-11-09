@@ -20,7 +20,7 @@ Install what you want manually or run the included `setup.bat`. It installs the 
 - Developer Mode on for Dotter symlinks (asks for administrator permission)
 - PowerShell 7 (Microsoft Store build) as the default Windows OpenSSH shell; a SYSTEM task re-points it at boot and hourly as Store updates change its path. The `sshd` service is set to Automatic and started
 - PSFzf installed; Windows Terminal set as the default terminal app with PowerShell 7 as its default profile
-- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher, and its Alt+Tab cycle, SUPER+Q, SUPER+Shift+W, SUPER+Alt+M and SUPER+Alt+S binds run it (re-run `setup-windows.ps1` after editing it)
+- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher (which also moves Start to SUPER+Alt), and its Alt+Tab cycle, SUPER+Q, SUPER+Shift+W, SUPER+Alt+M and SUPER+Alt+S binds run it (re-run `setup-windows.ps1` after editing it)
 - An elevated, hidden-at-logon scheduled task keeps `sshd.exe` windows and their descendants hidden (asks for administrator permission)
 - An elevated logon task (`PowerToys/Keyboard Manager/ctrl_caps_lock.py`) makes physical Ctrl+Caps Lock toggle Caps Lock, even while Caps Lock is remapped to Ctrl
 - A virtual display (`install-virtual-display.ps1`, cloned with the built-in screen) so Sunshine/Moonlight still works with the lid closed; set the lid to "Do nothing" with Flow Launcher's **Toggle Lid Sleep**
@@ -32,6 +32,7 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | Key | Action |
 |---|---|
 | SUPER+I | Key hints: search every keybind (fzf) |
+| SUPER+Alt (tap together) | Start menu (SUPER alone no longer opens it) |
 | Ctrl+Caps Lock | Toggle Caps Lock (turns it off if it gets stuck on) |
 | SUPER+Enter | Terminal (Windows Terminal, PowerShell 7) |
 | SUPER+H/J/K/L or arrows | Focus left / down / up / right |

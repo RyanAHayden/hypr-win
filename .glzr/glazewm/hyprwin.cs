@@ -9,6 +9,7 @@
 //   hyprwin unminimize        SUPER+ALT+M: restore a minimized window, preferring one from this workspace
 //   hyprwin scratchpad        SUPER+ALT+S: send the focused window to workspace S; on S, send it back
 //   hyprwin switcher          stays running (GlazeWM startup): SUPER+Tab window switcher; see the Switcher section.
+//                             It also stops SUPER alone opening Start; tapping SUPER+Alt opens it instead.
 //                             Starting it again replaces the running one.
 using System;
 using System.Collections;
@@ -112,12 +113,15 @@ static class HyprWin
 	[DllImport("user32.dll")] static extern bool PostThreadMessage(uint thread, uint message, IntPtr wParam, IntPtr lParam);
 	[DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
 	[DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string name);
+	[DllImport("user32.dll")] static extern IntPtr FindWindow(string className, string title);
+	[DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 	[StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam, lParam; public uint time; public int x, y; }
 
 	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
 	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51;
-	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_LMENU = 0xA4, VK_DUMMY = 0xFF;
-	const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2, WM_APP = 0x8000;
+	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_MENU = 0x12, VK_LMENU = 0xA4, VK_RMENU = 0xA5, VK_DUMMY = 0xFF;
+	const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2, WM_APP = 0x8000, WM_MODIFIER_DOWN = WM_APP + 1;
+	const uint WM_SYSCOMMAND = 0x0112, SC_TASKLIST = 0xF130;
 	// PowerToys' shortcut flag: PowerToys leaves keys sent with it alone, and this hook skips them too.
 	const long OurFlag = 0x101;
 
@@ -125,6 +129,8 @@ static class HyprWin
 	static IntPtr keyboardHook;
 	static uint mainThread;
 	static bool active, shiftTap, shiftTapUsed;
+	static bool chordHeld, chordClean;
+	static int keySeq;
 
 	static int Switcher()
 	{
@@ -141,7 +147,15 @@ static class HyprWin
 		Hook();
 		MSG msg;
 		while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0)
+		{
 			if (msg.message == WM_APP) Hook();
+			else if (msg.message == WM_MODIFIER_DOWN)
+			{
+				// Check the system's key state once the key has reached it (PowerToys may have swapped Alt and Win).
+				System.Threading.Thread.Sleep(10);
+				if (!chordHeld && (int)msg.wParam == keySeq && SuperHeld() && AltHeld()) chordHeld = chordClean = true;
+			}
+		}
 		return 0;
 	}
 
@@ -160,11 +174,28 @@ static class HyprWin
 		int vk = Marshal.ReadInt32(data);
 		bool up = (Marshal.ReadInt32(data, 8) & 0x80) != 0;
 		bool swallow = active ? WhileOpen(vk, up) : vk == VK_TAB && !up && SuperHeld() && Open();
+		if (!active && !swallow) StartMenuKey(vk, up);
 		return swallow ? (IntPtr)1 : CallNextHookEx(IntPtr.Zero, code, message, data);
 	}
 
 	// SUPER is whatever the system currently sees as Win (PowerToys may have remapped physical Alt to it).
 	static bool SuperHeld() { return (GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) < 0; }
+	static bool AltHeld() { return GetAsyncKeyState(VK_MENU) < 0; }
+
+	// SUPER's release opens Start whenever a SUPER bind swallowed its key, so mask every release with the dummy key.
+	// Start opens instead when SUPER+Alt is released with no other key pressed during it.
+	static void StartMenuKey(int vk, bool up)
+	{
+		if (vk != VK_LWIN && vk != VK_RWIN && vk != VK_MENU && vk != VK_LMENU && vk != VK_RMENU)
+		{
+			if (!up) { keySeq++; chordClean = false; }
+			return;
+		}
+		if (!up) { PostThreadMessage(mainThread, WM_MODIFIER_DOWN, (IntPtr)keySeq, IntPtr.Zero); return; }
+		if (chordHeld && chordClean) PostMessage(FindWindow("Shell_TrayWnd", null), WM_SYSCOMMAND, (IntPtr)SC_TASKLIST, IntPtr.Zero);
+		chordHeld = false;
+		if (SuperHeld()) Tap(VK_DUMMY);
+	}
 
 	static bool Open()
 	{
