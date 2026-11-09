@@ -106,5 +106,17 @@ if exist "%APPDATA%\AltSnap\AltSnap.ini" (
     echo AltSnap.ini not found
 )
 
+REM Copy PowerShell 7 profile and starship prompt config
+if exist "%SOURCE_DIR%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1" (
+    copy "%SOURCE_DIR%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1" "%DEST_DIR%PowerShell\Microsoft.PowerShell_profile.ps1" /Y
+    echo PowerShell profile copied successfully
+) else (
+    echo PowerShell profile not found
+)
+if exist "%SOURCE_DIR%\.config\starship.toml" (
+    copy "%SOURCE_DIR%\.config\starship.toml" "%DEST_DIR%PowerShell\starship.toml" /Y
+    echo starship.toml copied successfully
+)
+
 
 echo Done.

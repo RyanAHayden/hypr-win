@@ -6,6 +6,8 @@ general:
     - 'shell-exec zebar'
     - 'shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --service'
     - 'shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\Microsoft\PowerToys\Keyboard Manager\toggle_keyboard_layout.ps1" -Action reload'
+    # SUPER+Tab window switcher (Tab / Shift / HJKL / Q while holding SUPER).
+    - 'shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe switcher'
 
   # Commands to run just before the WM is shutdown.
   # Example: The below command kills Zebar.
@@ -30,7 +32,7 @@ general:
     # Trigger for cursor jump:
     # - 'monitor_focus': Jump when focus changes between monitors.
     # - 'window_focus': Jump when focus changes between windows.
-    trigger: 'monitor_focus'
+    trigger: 'window_focus'
 
   # How windows should be hidden when switching workspaces.
   # - 'cloak': (Windows-only) Recommended option for Windows.
@@ -222,7 +224,7 @@ keybindings:
   # - commands: ['wm-enable-binding-mode --name resize']
   #   bindings: ['alt+r']
 
-  # Disables window management and all other keybindings until alt+shift+p
+  # Disables window management and all other keybindings until SUPER+SHIFT+P
   # is pressed again.
   - commands: ['wm-toggle-pause']
     bindings: ['win+shift+p']
@@ -240,10 +242,11 @@ keybindings:
   - commands: ['toggle-floating --centered']
     bindings: ['win+t']
 
-  # Toggle the visibility of Zebar's bar windows.
+  # Toggle Zebar's bar windows.
   - commands: ['shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\toggle_zebar.ps1"']
     bindings: ['win+shift+space']
 
+  # Toggle focus lock (stops focus following the cursor).
   - commands: ['shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --toggle']
     bindings: ['win+shift+o']
 
@@ -251,13 +254,29 @@ keybindings:
   - commands: ['toggle-fullscreen']
     bindings: ['win+f']
 
-  # Minimize focused window.
-  # - commands: ['toggle-minimized']
-  #   bindings: ['win+m']
+  # Next window on this workspace (PowerToys turns Alt+Tab into F13; SUPER+Tab is the Windows switcher).
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe cycle next']
+    bindings: ['f13']
+  # Previous window on this workspace (PowerToys turns Alt+Shift+Tab into F14).
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe cycle prev']
+    bindings: ['f14']
+
+  # Minimize the focused window.
+  - commands: ['toggle-minimized']
+    bindings: ['win+m']
+  # Bring back a minimized window, preferring this workspace's.
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe unminimize']
+    bindings: ['win+alt+m']
 
   # Close focused window.
   - commands: ['close']
     bindings: ['win+w']
+  # Force kill the focused window's app.
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe kill']
+    bindings: ['win+shift+w']
+  # Quit the focused window's app (closes all its windows; it can still ask to save).
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe quit']
+    bindings: ['win+q']
 
   # Kill GlazeWM process safely.
   - commands: ['wm-exit']
@@ -272,23 +291,34 @@ keybindings:
     bindings: ['alt+shift+w']
 
   # Launch applications.
-  - commands: ['shell-exec powershell']
+
+  # Terminal (PowerShell 7).
+  - commands: ['shell-exec wt']
     bindings: ['win+enter']
 
+  # Firefox.
   - commands: ['shell-exec --hide-window cmd /c start firefox']
     bindings: ['win+shift+enter']
 
+  # Edge.
   - commands: ['shell-exec --hide-window cmd /c start msedge']
     bindings: ['win+shift+b']
 
+  # KeePassXC.
   - commands: ['shell-exec --hide-window cmd /c start "" "%USERPROFILE%\KeePassXC.lnk"']
-    bindings: ['win+shift+k']
+    bindings: ['win+shift+oem_question']
 
+  # VS Code.
   - commands: ['shell-exec code']
     bindings: ['win+shift+n']
 
+  # Spotify.
   - commands: ['shell-exec --hide-window cmd /c start spotify:']
     bindings: ['win+shift+m']
+
+  # Key hints: search every keybind.
+  - commands: ['shell-exec --hide-window cmd /c wt --title Keybinds --suppressApplicationTitle pwsh -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\keybinds.ps1"']
+    bindings: ['win+i']
 
   # Focus the next/previous active workspace defined in `workspaces` config.
   # - commands: ['focus --next-active-workspace']
@@ -316,7 +346,7 @@ keybindings:
 
   # Change focus to a workspace defined in `workspaces` config.
   - commands: ['focus --workspace 1']
-    bindings: ['win+s']
+    bindings: ['win+1']
   - commands: ['focus --workspace 2']
     bindings: ['win+2']
   - commands: ['focus --workspace 3']
@@ -335,8 +365,14 @@ keybindings:
     bindings: ['win+9']
   - commands: ['focus --workspace 0']
     bindings: ['win+0']
+
+  # Scratchpad (workspace S): go there, or back to where you came from if you're on it.
+  # When docked, S is the laptop screen's workspace.
   - commands: ['focus --workspace S']
-    bindings: ['alt+s']
+    bindings: ['win+s']
+  # Send the focused window to the scratchpad; on it, send the window back.
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe scratchpad']
+    bindings: ['win+alt+s']
 
   # Move focused window to a workspace defined in `workspaces` config.
   - commands: ['move --workspace 1', 'focus --workspace 1']
@@ -359,5 +395,3 @@ keybindings:
     bindings: ['win+shift+9']
   - commands: ['move --workspace 0', 'focus --workspace 0']
     bindings: ['win+shift+0']
-  - commands: ['move --workspace S']
-    bindings: ['win+alt+s', 'win+ctrl+s']

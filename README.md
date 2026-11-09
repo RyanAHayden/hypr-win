@@ -1,25 +1,73 @@
-# ryha-config
-This is My Windows Config For Tiling. <br>
-Mostly for personal reasons but feel free to mess around with the configs.
+# hypr-win
+
+My [Omarchy](https://omarchy.org)-style tiling setup on Windows, the Windows sibling of
+[hypr-mac](https://github.com/RyanAHayden/hypr-mac): the same keys, workspaces and shell.
+
+- **Tiling** with [GlazeWM](https://github.com/glzr-io/glazewm). SUPER is the Win key (physical left Alt on the remapped PowerToys layout), and the binds follow Omarchy's
+- **Workspaces** 1-10 plus a scratchpad (S), which is the laptop screen's workspace when docked
+- **Workspace bar** drawn by Zebar
+- **Unix-style shell**: PowerShell 7 in Windows Terminal with fzf, zoxide, eza, starship and zsh-like history search
+- **One command**: `setup.bat` installs everything and applies the Windows settings
 
 !! GlazeWM Zebar themes are not changed by `CHANGE_COLORS.md` yet.
 
-Install what you want manually or use the included `installs.bat`
+# Setup
+Install what you want manually or run the included `setup.bat`. It installs the apps and tools below, then runs `setup-windows.ps1` to apply the Windows settings this config expects:
+- Narrator, its Ctrl+Win+Enter shortcut and blue focus box off; Sticky/Filter/Toggle Keys shortcuts off
+- Snap, window arrangement and animations off (GlazeWM tiles instead)
+- Taskbar auto-hidden and left-aligned, no search box or Task View; dark mode, no transparency
+- File extensions and hidden files shown
+- Developer Mode on for Dotter symlinks (asks for administrator permission)
+- Machine-wide PowerShell 7 as the default Windows OpenSSH shell
+- PSFzf installed; Windows Terminal set as the default terminal app with PowerShell 7 as its default profile
+- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher, and its Alt+Tab cycle, SUPER+Q, SUPER+Shift+W, SUPER+Alt+M and SUPER+Alt+S binds run it (re-run `setup-windows.ps1` after editing it)
+- An elevated, hidden-at-logon scheduled task keeps `sshd.exe` windows and their descendants hidden (asks for administrator permission)
+
+Sign out and back in afterwards for every setting to apply.
+
+# Keys (SUPER = Win)
+GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/Keyboard Manager`), physical left Alt is Win (SUPER), Win is Alt, Caps Lock is Ctrl and Ctrl+H/J/K/L are arrows, so the bottom row reads Ctrl / Alt / SUPER like hypr-mac. Full list: `.glzr/glazewm/config.yaml` (SUPER+I searches it).
+
+| Key | Action |
+|---|---|
+| SUPER+I | Key hints: search every keybind (fzf) |
+| SUPER+Enter | Terminal (Windows Terminal, PowerShell 7) |
+| SUPER+H/J/K/L or arrows | Focus left / down / up / right |
+| SUPER+Shift+H/J/K/L or arrows | Move window |
+| SUPER+Tab | Window switcher, all windows. Keep holding SUPER: Tab next, Shift (tap) or Shift+Tab back, H/J/K/L move, Q closes the highlighted window; release SUPER to pick |
+| Alt+Tab (+Shift) | Cycle focus through the windows on this workspace (PowerToys sends F13/F14 to GlazeWM) |
+| SUPER+1..0 | Go to workspace (again goes back) |
+| SUPER+Shift+1..0 | Move window to workspace and follow |
+| SUPER+A / D | Previous / next workspace (with Shift: take the window) |
+| SUPER+S | Toggle scratchpad (workspace S) |
+| SUPER+Alt+S | Send window to the scratchpad and stay; on it, send the window back |
+| SUPER+M / SUPER+Alt+M | Minimize / bring back a minimized window (this workspace's first) |
+| SUPER+F / T | Fullscreen / float |
+| SUPER+W / SUPER+Shift+W | Close window / force kill its app |
+| SUPER+Q | Quit the app (closes all its windows; it can still ask to save) |
+| SUPER+\ | Change tiling direction |
+| SUPER+Shift+Space | Toggle the Zebar bar |
+| SUPER+Shift+O | Toggle focus lock |
+| SUPER+Shift+P | Pause all GlazeWM binds |
+| SUPER+Shift+Enter / B / N / M / / | Firefox / Edge / VS Code / Spotify / KeePassXC |
+| Alt+Shift+R / W / E | Reload config / redraw / quit GlazeWM |
+
+Unlike Hyprland, GlazeWM has no hidden special workspace, so the scratchpad is the real workspace S.
 
 # Linking configs with Dotter (Stow-style)
-[Dotter](https://github.com/SuperCuber/dotter) symlinks repo files into place, so edits in either location are the same file. The copy scripts still work as a fallback.
+[Dotter](https://github.com/SuperCuber/dotter) links selected repo files into their application config locations, so edits in either location update the same file.
 
-1. Enable Developer Mode (Settings > System > For developers), otherwise Dotter copies instead of linking.
-2. `winget install SuperCuber.Dotter`
-3. Run `copy_from_user_folder.bat` once and commit anything you want to keep, since the first deploy replaces the live files.
-4. Create `.dotter/local.toml` (not tracked) choosing packages from `.dotter/global.toml`:
+1. Install Dotter with `winget install SuperCuber.Dotter`.
+2. Enable Developer Mode (Settings > System > For developers) to allow symbolic links.
+3. Back up any existing config files that Dotter will manage; the first deployment may replace them.
+4. Choose packages in `.dotter/local.toml` (machine-local and not tracked). Package names and their file mappings are listed in `.dotter/global.toml`. For example:
    ```toml
-   packages = ["glazewm", "flowlauncher", "powertoys", "altsnap"]
+   packages = ["glazewm", "flowlauncher", "powertoys", "altsnap", "powershell"]
    ```
-   Zebar stays on `copy_to_user_folder.bat` because it won't load symlinked widget files.
-5. From the repo root: `dotter deploy --dry-run`, then `dotter deploy --force` the first time and `dotter deploy` after.
+   Add or remove package names to choose which configs to manage. Zebar isn't a Dotter package because it won't load symlinked widget files; `copy_to_user_folder.bat` deploys it.
+5. From the repo root, preview the changes with `dotter deploy --dry-run`. Deploy with `dotter deploy --force` the first time, then use `dotter deploy` for later updates.
 
-`dotter undeploy` removes the links. Some apps rewrite settings by replacing the file, which breaks the link; `dotter deploy` reports those.
+Run `dotter undeploy` to remove the links. If an app replaces a managed file instead of editing it, the link is broken; run `dotter deploy` again to restore it.
 
 # Install
 
@@ -38,7 +86,7 @@ winget install AltSnap.AltSnap
 ```
 
 ### Config:
-Use included AltSnap.ini (Copied in `copy_to_user_folder.bat`)
+The included `AltSnap.ini` is managed by the `altsnap` Dotter package.
 
 ## < [WindHawk](https://windhawk.net/) >
 ```
@@ -86,5 +134,27 @@ The keyboard-layout toggle and GlazeWM startup reload request administrator perm
 ```
 winget install xanderfrangos.twinkletray
 ```
+
+# Shell
+`PowerShell/Microsoft.PowerShell_profile.ps1` gives PowerShell 7 the same Unix-style shell as [hypr-mac](https://github.com/RyanAHayden/hypr-mac)'s `.zshrc`. It is the `powershell` Dotter package, along with the shared `starship.toml`. `setup.bat` installs the tools it uses (fzf, PSFzf, zoxide, eza, bat, fd, starship, Neovim).
+
+| Key / command | Action |
+|---|---|
+| Up / Down | history matching what's typed so far (`ssh`↑ → `ssh rycs`) |
+| Tab | completion menu |
+| Ctrl+R / Ctrl+T / Alt+C | fzf history / insert file / cd into dir |
+| Ctrl+A/E/W/U/K/Y, Alt+B/F | Emacs line editing, like bash/zsh |
+| Ctrl+X Ctrl+E | edit the command line in nvim |
+| `cd x` | normal cd, falls back to zoxide (most used dir matching `x`); `z`, `zi` work too |
+| `ls` `lsa` `lt` `lta` | eza long / all / tree / tree all |
+| `ff` `eff` `sff host:dir` | fzf with bat preview / open pick in nvim / scp pick |
+| `..` `...` `....` | up 1/2/3 directories |
+| `n` | nvim (current dir if no args) |
+| `g` `gcm` `gcam` `gcad` | git / commit -m / commit -a -m / commit -a --amend |
+| `ga branch` / `gd` | new branch in worktree `../<repo>--<branch>` / remove it from inside |
+| `compress dir` / `decompress file` | tar.gz |
+| `stay cmd...` | run detached |
+
+`gcm` replaces PowerShell's `Get-Command` alias; type `Get-Command` in full. Put machine-local additions in `profile.local.ps1` next to the profile; it isn't tracked.
 
 ---
