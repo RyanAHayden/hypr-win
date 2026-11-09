@@ -9,10 +9,12 @@
 //   hyprwin unminimize        SUPER+ALT+M: restore a minimized window, preferring one from this workspace
 //   hyprwin scratchpad        SUPER+ALT+S: send the focused window to workspace S; on S, send it back
 //   hyprwin togglesplit       SUPER+\: flip the split between the focused window and its sibling (Hyprland's togglesplit)
+//   hyprwin fullscreen [max]  toggle fullscreen (or maximized), returning the window to its old spot
 //   hyprwin dwindle           stays running (GlazeWM startup): new windows split the focused one along its longer side
 //   hyprwin switcher          stays running (GlazeWM startup): SUPER+Tab window switcher; see the Switcher section.
 //                             It also stops SUPER alone opening Start; tapping SUPER+Alt opens it instead.
 //                             SUPER+C / SUPER+V copy / paste everywhere; SUPER+Ctrl+V opens clipboard history.
+//                             SUPER+F / SUPER+ALT+F run fullscreen max / fullscreen without starting a process.
 //                             Starting either again replaces the running one.
 using System;
 using System.Collections;
@@ -37,10 +39,7 @@ static class HyprWin
 		if (args.Length > 0 && args[0] == "switcher") return Switcher();
 		try
 		{
-			var tcp = new TcpClient { NoDelay = true };
-			tcp.Connect("127.0.0.1", 6123);
-			stream = tcp.GetStream();
-			Handshake();
+			Connect();
 			switch (args.Length > 0 ? args[0] : "")
 			{
 				case "cycle": Cycle(args.Length > 1 && args[1] == "prev" ? -1 : 1); break;
@@ -49,12 +48,21 @@ static class HyprWin
 				case "unminimize": Unminimize(); break;
 				case "scratchpad": Scratchpad(); break;
 				case "togglesplit": ToggleSplit(); break;
+				case "fullscreen": Fullscreen(args.Length > 1 && args[1] == "max"); break;
 				case "dwindle": return Dwindle();
 				default: return 2;
 			}
 			return 0;
 		}
 		catch (Exception) { return 1; }
+	}
+
+	static void Connect()
+	{
+		var tcp = new TcpClient { NoDelay = true };
+		tcp.Connect("127.0.0.1", 6123);
+		stream = tcp.GetStream();
+		Handshake();
 	}
 
 	static void Cycle(int step)
@@ -121,12 +129,7 @@ static class HyprWin
 		}
 		int index = children.FindIndex(c => id.Equals(c["id"]));
 		bool horizontal = (string)parent["tilingDirection"] == "horizontal";
-		// GlazeWM flattens a split into a parent that tiles the same way, so the window's pair is the neighbour closest in size.
-		int pair = -1;
-		foreach (int i in new[] { index - 1, index + 1 })
-			if (i >= 0 && i < children.Count
-				&& (pair < 0 || Math.Abs(TilingSize(children[i]) - TilingSize(children[index])) < Math.Abs(TilingSize(children[pair]) - TilingSize(children[index]))))
-				pair = i;
+		int pair = PairOf(children, index);
 		var other = SoleWindow(children[pair]);
 		// GlazeWM can't move a group of windows, so it can't be wrapped together with this window.
 		if (other == null && children.Count > 2) return;
@@ -161,6 +164,27 @@ static class HyprWin
 			Resize(id, firstShare + secondShare, horizontal);
 		}
 		Command("focus --container-id " + id);
+	}
+
+	// GlazeWM flattens a split into a parent that tiles the same way, so a child's pair is the neighbour closest in size.
+	static int PairOf(List<Dictionary<string, object>> children, int index)
+	{
+		int pair = -1;
+		foreach (int i in new[] { index - 1, index + 1 })
+			if (i >= 0 && i < children.Count
+				&& (pair < 0 || Math.Abs(TilingSize(children[i]) - TilingSize(children[index])) < Math.Abs(TilingSize(children[pair]) - TilingSize(children[index]))))
+				pair = i;
+		return pair;
+	}
+
+	// GlazeWM returns a window to its old split, but a single-window split dwindle wrapped it in is gone by then.
+	static void Fullscreen(bool maximized)
+	{
+		var focused = Map(Map(Query("focused"))["focused"]);
+		if (focused == null || (string)focused["type"] != "window") return;
+		var id = (string)focused["id"];
+		if (State(focused) == "tiling") Unwrap(id);
+		Command("--id " + id + " toggle-fullscreen" + (maximized ? " --maximized" : ""));
 	}
 
 	// Resize the window's container that tiles along the given axis to a share of its parent.
@@ -259,6 +283,13 @@ static class HyprWin
 			if (!Receive().Contains("\"event_subscription\"")) continue;
 			var focused = Map(Map(Query("focused"))["focused"]);
 			if (focused == null || (string)focused["type"] != "window" || State(focused) != "tiling") continue;
+			// Changing splits would lose the spot GlazeWM returns a fullscreen window to.
+			var path = PathTo((string)focused["id"]);
+			if (path == null) continue;
+			bool hasFullscreen = false;
+			foreach (var c in List(path[0]["children"]))
+				if ((string)Map(c)["type"] == "window" && State(Map(c)) == "fullscreen") hasFullscreen = true;
+			if (hasFullscreen) continue;
 			bool wide = Convert.ToDouble(focused["width"]) >= Convert.ToDouble(focused["height"]);
 			Command("--id " + focused["id"] + " set-tiling-direction " + (wide ? "horizontal" : "vertical"));
 		}
@@ -298,7 +329,7 @@ static class HyprWin
 	[StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam, lParam; public uint time; public int x, y; }
 
 	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
-	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_INSERT = 0x2D;
+	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_F = 0x46, VK_INSERT = 0x2D;
 	const int VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3;
 	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_MENU = 0x12, VK_LMENU = 0xA4, VK_RMENU = 0xA5, VK_DUMMY = 0xFF;
 	const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2, WM_APP = 0x8000, WM_MODIFIER_DOWN = WM_APP + 1;
@@ -311,11 +342,23 @@ static class HyprWin
 	static uint mainThread;
 	static bool active, shiftTap, shiftTapUsed;
 	static bool chordHeld, chordClean;
-	static int keySeq, clipboardKey;
+	static int keySeq, clipboardKey, wmKey;
+	static readonly System.Collections.Concurrent.BlockingCollection<Action> jobs = new System.Collections.Concurrent.BlockingCollection<Action>();
 
 	static int Switcher()
 	{
 		if (!TakeOver("hyprwin-switcher")) return 1;
+
+		// GlazeWM commands from the hook run here, on one connection kept open (reconnecting if GlazeWM restarted).
+		new System.Threading.Thread(() =>
+		{
+			foreach (var job in jobs.GetConsumingEnumerable())
+				for (int attempt = 0; attempt < 2; attempt++)
+				{
+					try { if (stream == null) Connect(); job(); break; }
+					catch (Exception) { stream = null; }
+				}
+		}) { IsBackground = true }.Start();
 
 		mainThread = GetCurrentThreadId();
 		Hook();
@@ -348,7 +391,7 @@ static class HyprWin
 		int vk = Marshal.ReadInt32(data);
 		bool up = (Marshal.ReadInt32(data, 8) & 0x80) != 0;
 		bool wasActive = active;
-		bool swallow = active ? WhileOpen(vk, up) : (vk == VK_TAB && !up && SuperHeld() && Open()) || ClipboardKey(vk, up);
+		bool swallow = active ? WhileOpen(vk, up) : (vk == VK_TAB && !up && SuperHeld() && Open()) || ClipboardKey(vk, up) || WmKey(vk, up);
 		if (!wasActive && !active) StartMenuKey(vk, up);
 		return swallow ? (IntPtr)1 : CallNextHookEx(IntPtr.Zero, code, message, data);
 	}
@@ -398,6 +441,17 @@ static class HyprWin
 		Key(modifier, false); Tap(VK_INSERT, true); Key(modifier, true);
 		if (lwin) Key(VK_LWIN, false);
 		if (rwin) Key(VK_RWIN, false);
+		return true;
+	}
+
+	// SUPER+F maximizes, SUPER+Alt+F fullscreens. Handled here, not as GlazeWM binds, as starting hyprwin.exe takes ~100 ms.
+	static bool WmKey(int vk, bool up)
+	{
+		if (vk == wmKey) { if (up) wmKey = 0; return true; }
+		if (up || vk != VK_F || !SuperHeld() || GetAsyncKeyState(VK_SHIFT) < 0 || GetAsyncKeyState(VK_CONTROL) < 0) return false;
+		wmKey = vk;
+		bool maximized = !AltHeld();
+		jobs.Add(() => Fullscreen(maximized));
 		return true;
 	}
 

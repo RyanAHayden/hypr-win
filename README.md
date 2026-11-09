@@ -47,7 +47,8 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | SUPER+S | Toggle scratchpad (workspace S) |
 | SUPER+Alt+S | Send window to the scratchpad and stay; on it, send the window back |
 | SUPER+M / SUPER+Alt+M | Minimize / bring back a minimized window (this workspace's first) |
-| SUPER+F / T | Fullscreen / float |
+| SUPER+F / SUPER+Alt+F | Maximize (bar stays visible) / fullscreen |
+| SUPER+T | Float |
 | SUPER+W / SUPER+Shift+W | Close window / force kill its app |
 | SUPER+Q | Quit the app (closes all its windows; it can still ask to save) |
 | SUPER+\ | Flip the split between the focused window and its neighbour (Hyprland's togglesplit) |

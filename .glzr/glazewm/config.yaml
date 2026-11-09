@@ -25,7 +25,7 @@ general:
 
   # Whether to switch back and forth between the previously focused
   # workspace when focusing the current workspace.
-  toggle_workspace_on_refocus: true
+  toggle_workspace_on_refocus: false
 
   cursor_jump:
     # Whether to automatically move the cursor on the specified trigger.
@@ -270,9 +270,7 @@ keybindings:
   - commands: ['shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --toggle']
     bindings: ['win+shift+o']
 
-  # Change the focused window to be fullscreen.
-  - commands: ['toggle-fullscreen']
-    bindings: ['win+f']
+  # SUPER+F (maximize) and SUPER+Alt+F (fullscreen) are handled by `hyprwin switcher` for speed.
 
   # Next window on this workspace (PowerToys turns Alt+Tab into F13; SUPER+Tab is the Windows switcher).
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe cycle next']
@@ -386,9 +384,8 @@ keybindings:
   - commands: ['focus --workspace 0']
     bindings: ['win+0']
 
-  # Scratchpad (workspace S): go there, or back to where you came from if you're on it.
-  # When docked, S is the laptop screen's workspace.
-  - commands: ['focus --workspace S']
+  # Toggle the scratchpad workspace without toggling regular workspaces.
+  - commands: ['shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\toggle_scratchpad_workspace.ps1"']
     bindings: ['win+s']
   # Send the focused window to the scratchpad; on it, send the window back.
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe scratchpad']
