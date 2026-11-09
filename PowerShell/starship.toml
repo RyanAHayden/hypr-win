@@ -1,17 +1,17 @@
-# Linux starship.toml, cyan swapped for white (ANSI 7, the theme's foreground)
+# Linux starship.toml, cyan swapped for white (ANSI 7, the theme's foreground); directory and ❯ use GlazeWM's focused border color
 add_newline = true
 command_timeout = 200
 format = "[$directory$git_branch$git_status]($style)$character"
 
 [character]
 error_symbol = "[✗](bold white)"
-success_symbol = "[❯](bold white)"
+success_symbol = "[❯](bold #8dbcff)"
 
 [directory]
-style = "bold white"
+style = "bold #8dbcff"
 truncation_length = 2
 truncation_symbol = "…/"
-repo_root_style = "bold white"
+repo_root_style = "bold #8dbcff"
 repo_root_format = "[$repo_root]($repo_root_style)[$path]($style)[$read_only]($read_only_style) "
 
 [git_branch]
