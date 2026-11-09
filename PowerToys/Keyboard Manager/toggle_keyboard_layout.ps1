@@ -2,6 +2,17 @@ param(
     [string]$Action
 )
 
+if ($Action -eq 'reload') {
+    # Keyboard Manager must hook after GlazeWM, or GlazeWM sees keys before they are remapped.
+    $engine = Get-Process -Name "PowerToys.KeyboardManagerEngine" -ErrorAction SilentlyContinue
+    if ($engine) {
+        $enginePath = $engine.Path
+        Stop-Process -Id $engine.Id -Force
+        Start-Process -FilePath $enginePath
+    }
+    exit 0
+}
+
 $kbmDir = "$env:LOCALAPPDATA\Microsoft\PowerToys\Keyboard Manager"
 $defaultFile = Join-Path $kbmDir "default.json"
 $layoutRemapped = Join-Path $kbmDir "layout_remapped.json"

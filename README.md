@@ -14,9 +14,9 @@ Install what you want manually or use the included `installs.bat`
 3. Run `copy_from_user_folder.bat` once and commit anything you want to keep, since the first deploy replaces the live files.
 4. Create `.dotter/local.toml` (not tracked) choosing packages from `.dotter/global.toml`:
    ```toml
-   packages = ["glazewm", "zebar", "flowlauncher", "powertoys", "altsnap"]
+   packages = ["glazewm", "flowlauncher", "powertoys", "altsnap"]
    ```
-   Add `"zebar_ryha"` after `npm --prefix .glzr/zebar/ryha run build`.
+   Zebar stays on `copy_to_user_folder.bat` because it won't load symlinked widget files.
 5. From the repo root: `dotter deploy --dry-run`, then `dotter deploy --force` the first time and `dotter deploy` after.
 
 `dotter undeploy` removes the links. Some apps rewrite settings by replacing the file, which breaks the link; `dotter deploy` reports those.

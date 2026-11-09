@@ -6,15 +6,7 @@ default_target_type = "symbolic"
 ".glzr/glazewm/focus_lock.py" = "~/.glzr/glazewm/focus_lock.py"
 ".glzr/glazewm/toggle_zebar.ps1" = "~/.glzr/glazewm/toggle_zebar.ps1"
 
-[zebar.files]
-".glzr/zebar/settings.json" = "~/.glzr/zebar/settings.json"
-".glzr/zebar/.marketplace" = "~/.glzr/zebar/.marketplace"
-".glzr/zebar/tokyo-silence" = "~/.glzr/zebar/tokyo-silence"
-
-# Run `npm --prefix .glzr/zebar/ryha run build` before deploying this package.
-[zebar_ryha.files]
-".glzr/zebar/ryha/zpack.json" = "~/.glzr/zebar/ryha/zpack.json"
-".glzr/zebar/ryha/dist" = "~/.glzr/zebar/ryha/dist"
+# Zebar is left out: it won't load widget files through symlinks. copy_to_user_folder.bat deploys it.
 
 [flowlauncher.files]
 "FlowLauncher/Settings/Settings.json" = "~/AppData/Roaming/FlowLauncher/Settings/Settings.json"

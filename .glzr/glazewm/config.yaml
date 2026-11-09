@@ -5,6 +5,7 @@ general:
   startup_commands:
     - 'shell-exec zebar'
     - 'shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --service'
+    - 'shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\Microsoft\PowerToys\Keyboard Manager\toggle_keyboard_layout.ps1" -Action reload'
 
   # Commands to run just before the WM is shutdown.
   # Example: The below command kills Zebar.
