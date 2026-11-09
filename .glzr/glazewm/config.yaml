@@ -263,14 +263,19 @@ keybindings:
     bindings: ['win+t']
 
   # Toggle Zebar's bar windows.
-  - commands: ['shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\toggle_zebar.ps1"']
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglezebar']
     bindings: ['win+shift+space']
 
   # Toggle focus lock (stops focus following the cursor).
-  - commands: ['shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --toggle']
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe focuslock']
     bindings: ['win+shift+o']
 
-  # SUPER+F (maximize) and SUPER+Alt+F (fullscreen) are handled by `hyprwin switcher` for speed.
+  # Maximize the focused window (the bar stays visible).
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe fullscreen max']
+    bindings: ['win+f']
+  # Make the focused window fullscreen (covers the bar).
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe fullscreen']
+    bindings: ['win+alt+f']
 
   # Next window on this workspace (PowerToys turns Alt+Tab into F13; SUPER+Tab is the Windows switcher).
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe cycle next']
@@ -309,33 +314,34 @@ keybindings:
     bindings: ['alt+shift+w']
 
   # Launch applications.
+  # The hyprwin.exe binds above run in `hyprwin switcher` without starting a process; these only run if it isn't.
 
   # Terminal (PowerShell 7).
   - commands: ['shell-exec wt']
     bindings: ['win+enter']
 
   # Firefox.
-  - commands: ['shell-exec --hide-window cmd /c start firefox']
+  - commands: ['shell-exec firefox']
     bindings: ['win+shift+enter']
 
   # Edge.
-  - commands: ['shell-exec --hide-window cmd /c start msedge']
+  - commands: ['shell-exec msedge']
     bindings: ['win+shift+b']
 
   # KeePassXC.
-  - commands: ['shell-exec --hide-window cmd /c start "" "%USERPROFILE%\KeePassXC.lnk"']
+  - commands: ['shell-exec "%USERPROFILE%\KeePassXC.lnk"']
     bindings: ['win+shift+oem_question']
 
   # VS Code.
-  - commands: ['shell-exec code']
+  - commands: ['shell-exec "%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe"']
     bindings: ['win+shift+n']
 
   # Spotify.
-  - commands: ['shell-exec --hide-window cmd /c start spotify:']
+  - commands: ['shell-exec spotify:']
     bindings: ['win+shift+m']
 
   # Key hints: search every keybind.
-  - commands: ['shell-exec --hide-window cmd /c wt --title Keybinds --suppressApplicationTitle pwsh -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\keybinds.ps1"']
+  - commands: ['shell-exec wt --title Keybinds --suppressApplicationTitle pwsh -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\keybinds.ps1"']
     bindings: ['win+i']
 
   # Focus the next/previous active workspace defined in `workspaces` config.
@@ -385,7 +391,7 @@ keybindings:
     bindings: ['win+0']
 
   # Toggle the scratchpad workspace without toggling regular workspaces.
-  - commands: ['shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\toggle_scratchpad_workspace.ps1"']
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglescratchpad']
     bindings: ['win+s']
   # Send the focused window to the scratchpad; on it, send the window back.
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe scratchpad']

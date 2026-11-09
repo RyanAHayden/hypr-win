@@ -20,9 +20,10 @@ Install what you want manually or run the included `setup.bat`. It installs the 
 - Developer Mode on for Dotter symlinks (asks for administrator permission)
 - PowerShell 7 (Microsoft Store build) as the default Windows OpenSSH shell; a SYSTEM task re-points it at boot and hourly as Store updates change its path. The `sshd` service is set to Automatic and started
 - PSFzf installed; Windows Terminal set as the default terminal app with PowerShell 7 as its default profile
-- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher (which also moves Start to SUPER+Alt and handles SUPER+C/V) and the dwindle tiler, and its Alt+Tab cycle, SUPER+Q, SUPER+Shift+W, SUPER+Alt+M, SUPER+Alt+S and SUPER+\ binds run it (re-run `setup-windows.ps1` after editing it)
+- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher and the dwindle tiler. The switcher also moves Start to SUPER+Alt, handles SUPER+C/V, and runs the helper binds (Alt+Tab cycle, SUPER+S/F/Q/\\ and friends, Zebar and focus-lock toggles) on an open GlazeWM connection, so they don't start a process per press; GlazeWM's binds for them are the fallback (re-run `setup-windows.ps1` after editing it)
 - An elevated, hidden-at-logon scheduled task keeps `sshd.exe` windows and their descendants hidden (asks for administrator permission)
 - An elevated logon task (`PowerToys/Keyboard Manager/ctrl_caps_lock.py`) makes physical Ctrl+Caps Lock toggle Caps Lock, even while Caps Lock is remapped to Ctrl
+- GlazeWM and AltSnap start from logon tasks instead of the Run key, and Flow Launcher's logon task loses its delay, so they're up straight away; GlazeWM, AltSnap and hyprwin run at high CPU priority, Zebar and Flow Launcher above normal (asks for administrator permission)
 - A virtual display (`install-virtual-display.ps1`, cloned with the built-in screen) so Sunshine/Moonlight still works with the lid closed; set the lid to "Do nothing" with Flow Launcher's **Toggle Lid Sleep**
 Sign out and back in afterwards for every setting to apply.
 

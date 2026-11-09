@@ -97,4 +97,31 @@ Register-ElevatedPythonTask -TaskName 'Ryha Ctrl Caps Lock' `
 Set-Service -Name sshd -StartupType Automatic
 Start-Service -Name sshd
 
+# Keep the window manager, bar, launcher and helpers responsive under load, however they're started.
+# CpuPriorityClass: 3 = high, 6 = above normal.
+$ifeo = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options'
+foreach ($exe in @{ 'glazewm.exe' = 3; 'AltSnap.exe' = 3; 'hyprwin.exe' = 3; 'zebar.exe' = 6; 'Flow.Launcher.exe' = 6 }.GetEnumerator()) {
+	$key = "$ifeo\$($exe.Key)\PerfOptions"
+	if (-not (Test-Path $key)) { $null = New-Item $key -Force }
+	Set-ItemProperty $key CpuPriorityClass $exe.Value -Type DWord
+}
+Write-Host 'Raised the CPU priority of GlazeWM, AltSnap, hyprwin, Zebar and Flow Launcher.'
+
+# Run-key apps wait for Explorer's startup delay and start in no set order; logon tasks start right away.
+foreach ($app in @(
+	@{ Name = 'GlazeWM'; Path = "$env:ProgramFiles\glzr.io\GlazeWM\glazewm.exe" },
+	@{ Name = 'AltSnap'; Path = "$env:APPDATA\AltSnap\AltSnap.exe" }
+)) {
+	if (-not (Test-Path $app.Path)) { continue }
+	# Task priority 1 starts the app at high priority.
+	$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 1 `
+		-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+	Register-ScheduledTask -TaskName "Ryha $($app.Name)" -Action (New-ScheduledTaskAction -Execute $app.Path) `
+		-Trigger (New-ScheduledTaskTrigger -AtLogOn -User $user) `
+		-Principal (New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited) `
+		-Settings $settings -Description "Starts $($app.Name) at logon." -Force | Out-Null
+	Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' $app.Name -ErrorAction SilentlyContinue
+	Write-Host "Registered logon task 'Ryha $($app.Name)'."
+}
+
 & (Join-Path $PSScriptRoot 'install-virtual-display.ps1')

@@ -4,9 +4,7 @@ default_target_type = "symbolic"
 [glazewm.files]
 ".glzr/glazewm/config.yaml" = "~/.glzr/glazewm/config.yaml"
 ".glzr/glazewm/focus_lock.py" = "~/.glzr/glazewm/focus_lock.py"
-".glzr/glazewm/toggle_zebar.ps1" = "~/.glzr/glazewm/toggle_zebar.ps1"
 ".glzr/glazewm/keybinds.ps1" = "~/.glzr/glazewm/keybinds.ps1"
-".glzr/glazewm/toggle_scratchpad_workspace.ps1" = "~/.glzr/glazewm/toggle_scratchpad_workspace.ps1"
 
 # Zebar is left out: it won't load widget files through symlinks. copy_to_user_folder.bat deploys it.
 

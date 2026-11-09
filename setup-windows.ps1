@@ -48,6 +48,15 @@ Write-Host 'Showing file extensions and hidden files...'
 Set-Reg "$explorer\Advanced" HideFileExt 0
 Set-Reg "$explorer\Advanced" Hidden 1
 
+Write-Host 'Starting Flow Launcher right at logon, at raised priority...'
+# GlazeWM's and AltSnap's logon tasks need admin rights, so setup-elevated-windows.ps1 registers them. its own logon task (it rewrites it on updates); drop its delay and raise its priority.
+$flowTask = Get-ScheduledTask 'Flow.Launcher Startup' -ErrorAction SilentlyContinue
+if ($flowTask) {
+	$flowTask.Triggers[0].Delay = 'PT0S'
+	$flowTask.Settings.Priority = 2
+	Set-ScheduledTask -InputObject $flowTask | Out-Null
+}
+
 Write-Host 'Enabling Developer Mode (needed for Dotter symlinks)...'
 $devKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
 if ((Get-ItemProperty $devKey -ErrorAction SilentlyContinue).AllowDevelopmentWithoutDevLicense -ne 1) {
@@ -72,9 +81,9 @@ $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $glazewmDir = "$env:USERPROFILE\.glzr\glazewm"
 $hyprwin = "$glazewmDir\hyprwin.exe"
 New-Item -ItemType Directory -Force $glazewmDir | Out-Null
-# A running hyprwin.exe (the switcher) can't be overwritten, but it can be renamed out of the way.
-Remove-Item "$hyprwin.old" -ErrorAction SilentlyContinue
-if (Test-Path $hyprwin) { Move-Item $hyprwin "$hyprwin.old" -Force -ErrorAction SilentlyContinue }
+# A running hyprwin.exe (the switcher, dwindle) can't be overwritten, but it can be renamed out of the way.
+Remove-Item "$hyprwin.*old" -ErrorAction SilentlyContinue
+if (Test-Path $hyprwin) { Move-Item $hyprwin "$hyprwin.$(Get-Random).old" -Force -ErrorAction SilentlyContinue }
 & $csc /nologo /optimize /target:winexe /r:System.Web.Extensions.dll "/out:$hyprwin" "$PSScriptRoot\.glzr\glazewm\hyprwin.cs"
 if ($LASTEXITCODE) {
 	Write-Host '  Build failed; the SUPER+Tab switcher, Alt+Tab cycle, SUPER+Q and scratchpad binds need it.'

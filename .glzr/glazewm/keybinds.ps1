@@ -44,7 +44,6 @@ foreach ($line in Get-Content $config) {
 }
 
 $rows += [pscustomobject]@{ Keys = 'SUPER + TAB'; Description = 'Window switcher, all windows: hold SUPER; Tab / Shift back / H J K L move / Q close'; Command = 'hyprwin.exe switcher' }
-$rows += [pscustomobject]@{ Keys = 'SUPER + F  /  SUPER + ALT + F'; Description = 'Maximize (bar stays visible) / fullscreen'; Command = 'hyprwin.exe switcher' }
 
 $width = ($rows.Keys | Measure-Object -Maximum Length).Maximum + 3
 $lines = $rows | ForEach-Object { $_.Keys.PadRight($width) + $_.Description + "  `e[90m" + $_.Command + "`e[0m" }

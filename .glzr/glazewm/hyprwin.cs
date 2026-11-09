@@ -8,6 +8,9 @@
 //   hyprwin kill              SUPER+SHIFT+W: force kill the focused window's app
 //   hyprwin unminimize        SUPER+ALT+M: restore a minimized window, preferring one from this workspace
 //   hyprwin scratchpad        SUPER+ALT+S: send the focused window to workspace S; on S, send it back
+//   hyprwin togglescratchpad  SUPER+S: go to workspace S; on S, go back to the previous workspace
+//   hyprwin togglezebar       SUPER+SHIFT+SPACE: show / hide the Zebar bar
+//   hyprwin focuslock         SUPER+SHIFT+O: toggle focus_lock.py's lock (stops focus following the cursor)
 //   hyprwin togglesplit       SUPER+\: flip the split between the focused window and its sibling (Hyprland's togglesplit)
 //   hyprwin fullscreen [max]  toggle fullscreen (or maximized), returning the window to its old spot
 //   hyprwin dwindle           stays running (GlazeWM startup): new windows split the focused one along its longer side
@@ -15,6 +18,8 @@
 //                             It also stops SUPER alone opening Start; tapping SUPER+Alt opens it instead.
 //                             SUPER+C / SUPER+V copy / paste everywhere; SUPER+Ctrl+V opens clipboard history.
 //                             SUPER+F / SUPER+ALT+F run fullscreen max / fullscreen without starting a process.
+//                             The switcher also runs every bind above without starting a process (~100 ms each);
+//                             GlazeWM's binds for them only run if the switcher isn't.
 //                             Starting either again replaces the running one.
 using System;
 using System.Collections;
@@ -37,6 +42,8 @@ static class HyprWin
 	static int Main(string[] args)
 	{
 		if (args.Length > 0 && args[0] == "switcher") return Switcher();
+		if (args.Length > 0 && args[0] == "togglezebar") { ToggleZebar(); return 0; }
+		if (args.Length > 0 && args[0] == "focuslock") { ToggleFocusLock(); return 0; }
 		try
 		{
 			Connect();
@@ -47,6 +54,7 @@ static class HyprWin
 				case "kill": Quit(true); break;
 				case "unminimize": Unminimize(); break;
 				case "scratchpad": Scratchpad(); break;
+				case "togglescratchpad": ToggleScratchpad(); break;
 				case "togglesplit": ToggleSplit(); break;
 				case "fullscreen": Fullscreen(args.Length > 1 && args[1] == "max"); break;
 				case "dwindle": return Dwindle();
@@ -110,6 +118,51 @@ static class HyprWin
 	{
 		var workspace = FocusedWorkspace();
 		Command(workspace != null && (string)workspace["name"] == "S" ? "move --recent-workspace" : "move --workspace S");
+	}
+
+	static void ToggleScratchpad()
+	{
+		var workspace = FocusedWorkspace();
+		Command(workspace != null && (string)workspace["name"] == "S" ? "focus --recent-workspace" : "focus --workspace S");
+	}
+
+	delegate bool EnumWindowsProc(IntPtr window, IntPtr parameter);
+	[DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc callback, IntPtr parameter);
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
+	[DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
+	[DllImport("user32.dll")] static extern bool ShowWindowAsync(IntPtr window, int command);
+
+	static void ToggleZebar()
+	{
+		var zebar = new HashSet<uint>();
+		foreach (var p in Process.GetProcessesByName("zebar")) zebar.Add((uint)p.Id);
+		var bars = new List<IntPtr>();
+		EnumWindows((window, _) =>
+		{
+			uint pid;
+			GetWindowThreadProcessId(window, out pid);
+			var title = new StringBuilder(512);
+			if (zebar.Contains(pid) && GetWindowText(window, title, title.Capacity) > 0
+				&& title.ToString().EndsWith(" / bar", StringComparison.OrdinalIgnoreCase)) bars.Add(window);
+			return true;
+		}, IntPtr.Zero);
+		bool show = bars.Exists(w => !IsWindowVisible(w));
+		foreach (var w in bars) ShowWindowAsync(w, show ? 5 : 0);
+	}
+
+	// focus_lock.py --service watches this file for a new revision.
+	static void ToggleFocusLock()
+	{
+		var file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), @".glzr\glazewm\focus-lock.json");
+		Dictionary<string, object> state = null;
+		try { state = Map(json.DeserializeObject(File.ReadAllText(file))); }
+		catch (Exception) { }
+		bool locked = state != null && true.Equals(state["locked"]);
+		int revision = state != null && state.ContainsKey("revision") ? Convert.ToInt32(state["revision"]) : 0;
+		var temporary = Path.ChangeExtension(file, ".tmp");
+		File.WriteAllText(temporary, json.Serialize(new Dictionary<string, object> { { "locked", !locked }, { "revision", revision + 1 } }));
+		if (File.Exists(file)) File.Replace(temporary, file, null);
+		else File.Move(temporary, file);
 	}
 
 	static void ToggleSplit()
@@ -330,6 +383,7 @@ static class HyprWin
 
 	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
 	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_F = 0x46, VK_INSERT = 0x2D;
+	const int VK_W = 0x57, VK_M = 0x4D, VK_S = 0x53, VK_O = 0x4F, VK_SPACE = 0x20, VK_BACKSLASH = 0xDC, VK_F13 = 0x7C, VK_F14 = 0x7D;
 	const int VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3;
 	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_MENU = 0x12, VK_LMENU = 0xA4, VK_RMENU = 0xA5, VK_DUMMY = 0xFF;
 	const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2, WM_APP = 0x8000, WM_MODIFIER_DOWN = WM_APP + 1;
@@ -352,6 +406,9 @@ static class HyprWin
 		// GlazeWM commands from the hook run here, on one connection kept open (reconnecting if GlazeWM restarted).
 		new System.Threading.Thread(() =>
 		{
+			// Connect and run the JSON code once now, so the first key press doesn't pay for it (~150 ms).
+			try { Connect(); FocusedWorkspace(); PathTo(""); }
+			catch (Exception) { stream = null; }
 			foreach (var job in jobs.GetConsumingEnumerable())
 				for (int attempt = 0; attempt < 2; attempt++)
 				{
@@ -387,9 +444,12 @@ static class HyprWin
 
 	static IntPtr OnKey(int code, IntPtr message, IntPtr data)
 	{
-		if (code < 0 || Marshal.ReadInt64(data, 16) == OurFlag) return CallNextHookEx(IntPtr.Zero, code, message, data);
+		if (code < 0) return CallNextHookEx(IntPtr.Zero, code, message, data);
 		int vk = Marshal.ReadInt32(data);
 		bool up = (Marshal.ReadInt32(data, 8) & 0x80) != 0;
+		// PowerToys sends F13/F14 (from Alt+Tab) with the flag this hook otherwise skips.
+		if (!active && (vk == VK_F13 || vk == VK_F14) && WmKey(vk, up)) return (IntPtr)1;
+		if (Marshal.ReadInt64(data, 16) == OurFlag) return CallNextHookEx(IntPtr.Zero, code, message, data);
 		bool wasActive = active;
 		bool swallow = active ? WhileOpen(vk, up) : (vk == VK_TAB && !up && SuperHeld() && Open()) || ClipboardKey(vk, up) || WmKey(vk, up);
 		if (!wasActive && !active) StartMenuKey(vk, up);
@@ -444,15 +504,36 @@ static class HyprWin
 		return true;
 	}
 
-	// SUPER+F maximizes, SUPER+Alt+F fullscreens. Handled here, not as GlazeWM binds, as starting hyprwin.exe takes ~100 ms.
+	// The binds above, run here rather than by GlazeWM starting hyprwin.exe (~100 ms) or a script for each press.
 	static bool WmKey(int vk, bool up)
 	{
 		if (vk == wmKey) { if (up) wmKey = 0; return true; }
-		if (up || vk != VK_F || !SuperHeld() || GetAsyncKeyState(VK_SHIFT) < 0 || GetAsyncKeyState(VK_CONTROL) < 0) return false;
+		if (up) return false;
+		var action = WmAction(vk);
+		if (action == null) return false;
 		wmKey = vk;
-		bool maximized = !AltHeld();
-		jobs.Add(() => Fullscreen(maximized));
+		jobs.Add(action);
 		return true;
+	}
+
+	static Action WmAction(int vk)
+	{
+		if (vk == VK_F13) return () => Cycle(1);
+		if (vk == VK_F14) return () => Cycle(-1);
+		if (!SuperHeld() || GetAsyncKeyState(VK_CONTROL) < 0) return null;
+		bool shift = GetAsyncKeyState(VK_SHIFT) < 0, alt = AltHeld();
+		switch (vk)
+		{
+			case VK_F: return shift ? null : alt ? (Action)(() => Fullscreen(false)) : () => Fullscreen(true);
+			case VK_Q: return shift || alt ? null : (Action)(() => Quit(false));
+			case VK_W: return shift && !alt ? (Action)(() => Quit(true)) : null;
+			case VK_M: return alt && !shift ? (Action)Unminimize : null;
+			case VK_S: return shift ? null : alt ? (Action)Scratchpad : ToggleScratchpad;
+			case VK_BACKSLASH: return shift || alt ? null : (Action)ToggleSplit;
+			case VK_SPACE: return shift && !alt ? (Action)ToggleZebar : null;
+			case VK_O: return shift && !alt ? (Action)ToggleFocusLock : null;
+		}
+		return null;
 	}
 
 	static bool Open()
