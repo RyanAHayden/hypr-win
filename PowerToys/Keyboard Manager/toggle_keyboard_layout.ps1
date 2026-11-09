@@ -1,6 +1,26 @@
 param(
+    [ValidateSet('reload')]
     [string]$Action
 )
+
+$ErrorActionPreference = 'Stop'
+
+# Remapping into admin windows requires an elevated engine, including after a reload.
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
+    if ($Action) {
+        $arguments += " -Action `"$Action`""
+    }
+    try {
+        $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+    } catch [System.ComponentModel.Win32Exception] {
+        Write-Error "Keyboard Manager needs administrator permission to work in admin windows. Elevation failed: $($_.Exception.Message)"
+        exit 1
+    }
+    exit $process.ExitCode
+}
 
 if ($Action -eq 'reload') {
     # Keyboard Manager must hook after GlazeWM, or GlazeWM sees keys before they are remapped.

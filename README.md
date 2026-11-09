@@ -73,6 +73,11 @@ Set explorer shortcuts like these:
 <img src="README_Assets/example_quicklaunch.png" alt="example" width="400" />
 
 # Recommended
+## Keyboard bindings in administrator windows
+PowerToys must run as administrator for Keyboard Manager remaps to work in elevated terminals. This config enables **Always run as administrator** and elevated-app warnings. After deploying, use PowerToys Settings > General > **Restart as administrator** once; changing the config does not elevate an already-running process.
+
+The keyboard-layout toggle and GlazeWM startup reload request administrator permission before restarting the remapper, preserving support for admin windows. Accept the UAC prompt; cancelling leaves the current engine/layout unchanged. Only PowerToys and the remapper restart script need elevation, not your normal terminals or other apps.
+
 ## < [Zen Browser](https://zen-browser.app/) >
 ### Settings
 - Compact Hides Sidebar and Top Toolbar
