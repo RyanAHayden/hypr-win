@@ -1,6 +1,10 @@
 import argparse
 import asyncio
+import ctypes
 import json
+import shutil
+import subprocess
+from ctypes import wintypes
 from pathlib import Path
 
 import websockets
@@ -11,6 +15,100 @@ STOP_PATH = STATE_PATH.with_suffix(".stop")
 IPC_URL = "ws://127.0.0.1:6123"
 STATUS_HOST = "127.0.0.1"
 STATUS_PORT = 6125
+# GlazeWM's raw-input listener ignores input tagged with its own marker.
+GLAZEWM_INPUT_MARKER = 6379
+
+user32 = ctypes.WinDLL("user32", use_last_error=True)
+user32.GetForegroundWindow.restype = wintypes.HWND
+user32.GetShellWindow.restype = wintypes.HWND
+user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+
+
+class MOUSEINPUT(ctypes.Structure):
+    _fields_ = [
+        ("dx", wintypes.LONG),
+        ("dy", wintypes.LONG),
+        ("mouseData", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_size_t),
+    ]
+
+
+class INPUT(ctypes.Structure):
+    class _INPUT(ctypes.Union):
+        _fields_ = [("mi", MOUSEINPUT), ("padding", ctypes.c_byte * 32)]
+
+    _anonymous_ = ("input",)
+    _fields_ = [("type", wintypes.DWORD), ("input", _INPUT)]
+
+
+def send_dummy_input():
+    # Recent input grants this process permission to change the foreground window.
+    dummy = INPUT(type=0)
+    dummy.mi = MOUSEINPUT(0, 0, 0, 0x0001, 0, GLAZEWM_INPUT_MARKER)
+    user32.SendInput(1, ctypes.byref(dummy), ctypes.sizeof(INPUT))
+
+
+def resync_native_focus(handle):
+    # GlazeWM 3.10.1 disables focus_follows_cursor when a window becomes
+    # foreground before it is managed: refocusing an already-foreground window
+    # emits no foreground event, so its focus-sync flag is never restored.
+    # Bouncing foreground through the shell window emits that event.
+    if not handle or user32.GetForegroundWindow() != handle:
+        return
+    send_dummy_input()
+    if user32.SetForegroundWindow(user32.GetShellWindow()):
+        send_dummy_input()
+        user32.SetForegroundWindow(handle)
+
+
+async def resync_after_manage(handle):
+    await asyncio.sleep(0.15)
+    if not read_state().get("locked"):
+        resync_native_focus(handle)
+
+
+ZEBAR_CHECK_SECONDS = 5
+# Require consecutive misses so GlazeWM's shutdown taskkill isn't undone.
+ZEBAR_MISSES_BEFORE_RESTART = 2
+
+
+def process_running(image_name):
+    output = subprocess.run(
+        ["tasklist", "/FI", f"IMAGENAME eq {image_name}", "/NH", "/FO", "CSV"],
+        capture_output=True,
+        text=True,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    ).stdout
+    return f'"{image_name.lower()}"' in output.lower()
+
+
+def start_zebar():
+    zebar = shutil.which("zebar")
+    if not zebar:
+        return
+    # Detach so Zebar doesn't die with whichever process tree launched it.
+    flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    try:
+        subprocess.Popen([zebar], creationflags=flags | subprocess.CREATE_BREAKAWAY_FROM_JOB)
+    except OSError:
+        subprocess.Popen([zebar], creationflags=flags)
+
+
+async def keep_zebar_running(stop_event):
+    misses = 0
+    while not stop_event.is_set():
+        await asyncio.sleep(ZEBAR_CHECK_SECONDS)
+        zebar_running = await asyncio.to_thread(process_running, "zebar.exe")
+        glazewm_running = await asyncio.to_thread(process_running, "glazewm.exe")
+        if zebar_running or not glazewm_running:
+            misses = 0
+            continue
+        misses += 1
+        if misses >= ZEBAR_MISSES_BEFORE_RESTART and not stop_event.is_set():
+            start_zebar()
+            misses = 0
 
 
 def read_state():
@@ -86,6 +184,8 @@ async def handle_event(websocket, lock_state, data, revision):
             asyncio.create_task(
                 restore_after_sync(websocket, lock_state, revision, target_id)
             )
+        else:
+            asyncio.create_task(resync_after_manage(window.get("handle")))
     elif event_type == "focus_changed":
         focused = data.get("focusedContainer") or {}
         target_id = lock_state.focus_changed(container_id(focused))
@@ -185,6 +285,7 @@ async def run_service():
     stop_event = asyncio.Event()
     server = await asyncio.start_server(serve_status, STATUS_HOST, STATUS_PORT)
     ipc_task = asyncio.create_task(run_ipc(stop_event))
+    zebar_task = asyncio.create_task(keep_zebar_running(stop_event))
 
     async with server:
         while not STOP_PATH.exists():
@@ -192,7 +293,8 @@ async def run_service():
 
     stop_event.set()
     ipc_task.cancel()
-    await asyncio.gather(ipc_task, return_exceptions=True)
+    zebar_task.cancel()
+    await asyncio.gather(ipc_task, zebar_task, return_exceptions=True)
     write_state(False)
 
 
