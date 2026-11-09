@@ -12,10 +12,10 @@ powercfg /setactive SCHEME_CURRENT
 # after the built-in screen turns off.
 $message = if ($next -eq 0) { 'Closing the lid keeps the PC awake (screen off, still streamable)' } else { 'Closing the lid sleeps the PC' }
 
-Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-$notify = New-Object System.Windows.Forms.NotifyIcon
-$notify.Icon = [System.Drawing.SystemIcons]::Information
-$notify.Visible = $true
-$notify.ShowBalloonTip(3000, 'Lid sleep', $message, [System.Windows.Forms.ToolTipIcon]::Info)
-Start-Sleep -Seconds 4
-$notify.Dispose()
+# A tray balloon from a hidden script often never shows on Windows 11; a toast under PowerShell's app ID does.
+[void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+[void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+$toast = New-Object Windows.Data.Xml.Dom.XmlDocument
+$toast.LoadXml("<toast><visual><binding template='ToastGeneric'><text>Lid sleep</text><text>$([Security.SecurityElement]::Escape($message))</text></binding></visual></toast>")
+$powershellAppId = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($powershellAppId).Show([Windows.UI.Notifications.ToastNotification]::new($toast))
