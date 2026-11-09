@@ -4,6 +4,7 @@ import ctypes
 import json
 import shutil
 import subprocess
+import time
 from ctypes import wintypes
 from pathlib import Path
 
@@ -17,6 +18,8 @@ STATUS_HOST = "127.0.0.1"
 STATUS_PORT = 6125
 # GlazeWM's raw-input listener ignores input tagged with its own marker.
 GLAZEWM_INPUT_MARKER = 6379
+# How long after a window opens its focus is treated as stealing.
+STEAL_GRACE_SECONDS = 1.0
 
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 user32.GetForegroundWindow.restype = wintypes.HWND
@@ -131,23 +134,33 @@ class FocusLockState:
     def __init__(self):
         self.locked = False
         self.target_id = None
-        self.managed_ids = set()
+        self.new_windows = {}
 
     def set_locked(self, locked, focused_id=None):
         self.locked = locked
-        self.managed_ids.clear()
+        self.new_windows.clear()
         self.target_id = focused_id if locked else None
 
     def window_managed(self, container_id):
         if self.locked and container_id:
-            self.managed_ids.add(container_id)
+            now = time.monotonic()
+            self.new_windows = {
+                window_id: managed_at
+                for window_id, managed_at in self.new_windows.items()
+                if now - managed_at < STEAL_GRACE_SECONDS
+            }
+            self.new_windows[container_id] = now
             return self.target_id
         return None
 
     def focus_changed(self, container_id):
         if not self.locked or not container_id:
             return None
-        if container_id in self.managed_ids:
+        # Only focus that arrives right after a window opens counts as stealing;
+        # later focus (keybinds, hover) moves the lock target to that window.
+        managed_at = self.new_windows.pop(container_id, None)
+        if managed_at is not None and time.monotonic() - managed_at < STEAL_GRACE_SECONDS:
+            self.new_windows[container_id] = managed_at
             return self.target_id
         self.target_id = container_id
         return None
