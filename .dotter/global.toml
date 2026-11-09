@@ -20,9 +20,9 @@ default_target_type = "symbolic"
 "FlowLauncher/Settings/Settings.json" = "~/AppData/Roaming/FlowLauncher/Settings/Settings.json"
 "FlowLauncher/Themes/ryha.xaml" = "~/AppData/Roaming/FlowLauncher/Themes/ryha.xaml"
 
+# Keyboard Manager/default.json is left out: toggle_keyboard_layout.ps1 overwrites it to switch layouts.
 [powertoys.files]
 "PowerToys/settings.json" = "~/AppData/Local/Microsoft/PowerToys/settings.json"
-"PowerToys/Keyboard Manager/default.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/default.json"
 "PowerToys/Keyboard Manager/editorSettings.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/editorSettings.json"
 "PowerToys/Keyboard Manager/settings.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/settings.json"
 "PowerToys/Keyboard Manager/layout_default.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/layout_default.json"
