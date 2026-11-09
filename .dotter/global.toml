@@ -1,0 +1,34 @@
+[settings]
+default_target_type = "symbolic"
+
+[glazewm.files]
+".glzr/glazewm/config.yaml" = "~/.glzr/glazewm/config.yaml"
+".glzr/glazewm/focus_lock.py" = "~/.glzr/glazewm/focus_lock.py"
+".glzr/glazewm/toggle_zebar.ps1" = "~/.glzr/glazewm/toggle_zebar.ps1"
+
+[zebar.files]
+".glzr/zebar/settings.json" = "~/.glzr/zebar/settings.json"
+".glzr/zebar/.marketplace" = "~/.glzr/zebar/.marketplace"
+".glzr/zebar/tokyo-silence" = "~/.glzr/zebar/tokyo-silence"
+
+# Run `npm --prefix .glzr/zebar/ryha run build` before deploying this package.
+[zebar_ryha.files]
+".glzr/zebar/ryha/zpack.json" = "~/.glzr/zebar/ryha/zpack.json"
+".glzr/zebar/ryha/dist" = "~/.glzr/zebar/ryha/dist"
+
+[flowlauncher.files]
+"FlowLauncher/Settings/Settings.json" = "~/AppData/Roaming/FlowLauncher/Settings/Settings.json"
+"FlowLauncher/Themes/ryha.xaml" = "~/AppData/Roaming/FlowLauncher/Themes/ryha.xaml"
+
+[powertoys.files]
+"PowerToys/settings.json" = "~/AppData/Local/Microsoft/PowerToys/settings.json"
+"PowerToys/Keyboard Manager/default.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/default.json"
+"PowerToys/Keyboard Manager/editorSettings.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/editorSettings.json"
+"PowerToys/Keyboard Manager/settings.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/settings.json"
+"PowerToys/Keyboard Manager/layout_default.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/layout_default.json"
+"PowerToys/Keyboard Manager/layout_remapped.json" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/layout_remapped.json"
+"PowerToys/Keyboard Manager/toggle_keyboard_layout.ps1" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/toggle_keyboard_layout.ps1"
+"PowerToys/Keyboard Manager/toggle_keyboard_layout.bat" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/toggle_keyboard_layout.bat"
+
+[altsnap.files]
+"AltSnap.ini" = "~/AppData/Roaming/AltSnap/AltSnap.ini"
