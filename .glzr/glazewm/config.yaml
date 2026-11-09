@@ -244,6 +244,16 @@ keybindings:
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglesplit']
     bindings: ['win+oem_pipe']
 
+  # Resize the focused window: SUPER+-/= width, with Shift height.
+  - commands: ['resize --width -5%']
+    bindings: ['win+oem_minus']
+  - commands: ['resize --width +5%']
+    bindings: ['win+oem_plus']
+  - commands: ['resize --height -5%']
+    bindings: ['win+shift+oem_minus']
+  - commands: ['resize --height +5%']
+    bindings: ['win+shift+oem_plus']
+
   # Change focus from tiling windows -> floating -> fullscreen.
   # - commands: ['wm-cycle-focus']
   #   bindings: ['alt+space']
