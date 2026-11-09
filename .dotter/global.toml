@@ -11,6 +11,7 @@ default_target_type = "symbolic"
 [flowlauncher.files]
 "FlowLauncher/Settings/Settings.json" = "~/AppData/Roaming/FlowLauncher/Settings/Settings.json"
 "FlowLauncher/Themes/ryha.xaml" = "~/AppData/Roaming/FlowLauncher/Themes/ryha.xaml"
+"FlowLauncher/Scripts/toggle_lid_sleep.ps1" = "~/AppData/Roaming/FlowLauncher/Scripts/toggle_lid_sleep.ps1"
 
 # Keyboard Manager/default.json is left out: toggle_keyboard_layout.ps1 overwrites it to switch layouts.
 [powertoys.files]
@@ -24,3 +25,7 @@ default_target_type = "symbolic"
 
 [altsnap.files]
 "AltSnap.ini" = "~/AppData/Roaming/AltSnap/AltSnap.ini"
+
+[powershell.files]
+"PowerShell/Microsoft.PowerShell_profile.ps1" = "~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1"
+"PowerShell/starship.toml" = "~/.config/starship.toml"

@@ -63,6 +63,13 @@ if exist "%SOURCE_DIR%FlowLauncher" (
     ) else (
         echo FlowLauncher plugin settings folder not found
     )
+
+    if exist "%SOURCE_DIR%FlowLauncher\Scripts" (
+        xcopy "%SOURCE_DIR%FlowLauncher\Scripts" "%DEST_DIR%\AppData\Roaming\FlowLauncher\Scripts" /E /I /Y
+        REM Start Menu shortcut so Flow Launcher can find "Toggle Lid Sleep"
+        powershell -NoProfile -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%APPDATA%\Microsoft\Windows\Start Menu\Programs\Toggle Lid Sleep.lnk'); $s.TargetPath = 'powershell.exe'; $s.Arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"%DEST_DIR%\AppData\Roaming\FlowLauncher\Scripts\toggle_lid_sleep.ps1\"'; $s.WindowStyle = 7; $s.IconLocation = '%SystemRoot%\System32\powercpl.dll,0'; $s.Description = 'Toggle whether closing the lid sleeps the PC'; $s.Save()"
+        echo FlowLauncher scripts and Toggle Lid Sleep shortcut copied
+    )
 ) else (
     echo FlowLauncher folder not found
 )
@@ -128,6 +135,17 @@ if exist "%SOURCE_DIR%AltSnap.ini" (
     echo AltSnap.ini copied successfully to user folder and AppData
 ) else (
     echo AltSnap.ini not found
+)
+
+REM Copy PowerShell 7 profile and starship prompt config
+if exist "%SOURCE_DIR%PowerShell" (
+    if not exist "%DEST_DIR%\Documents\PowerShell" mkdir "%DEST_DIR%\Documents\PowerShell"
+    copy "%SOURCE_DIR%PowerShell\Microsoft.PowerShell_profile.ps1" "%DEST_DIR%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1" /Y
+    if not exist "%DEST_DIR%\.config" mkdir "%DEST_DIR%\.config"
+    copy "%SOURCE_DIR%PowerShell\starship.toml" "%DEST_DIR%\.config\starship.toml" /Y
+    echo PowerShell profile and starship.toml copied successfully
+) else (
+    echo PowerShell folder not found
 )
 
 echo Done.
