@@ -16,7 +16,7 @@ if (-not (Test-Path $defaultFile)) {
 $currentContent = Get-Content $defaultFile -Raw
 
 # Determine whether current layout is remapped or default
-# Remapped layout contains originalKeys "20" (CapsLock) or "164" (Alt)
+# Laptop layout remaps Alt to Win and Caps Lock/Win to Ctrl.
 $isRemapped = $false
 try {
     $jsonObj = $currentContent | ConvertFrom-Json
@@ -35,21 +35,21 @@ if ($isRemapped) {
         Copy-Item $layoutDefault $defaultFile -Force
     } else {
         # Fallback if layout_default.json doesn't exist
-        $fallback = '{"remapKeys":{"inProcess":[]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"91;32","exactMatch":false,"operationType":0,"newRemapKeys":"164;32"},{"originalKeys":"91;65","exactMatch":false,"operationType":0,"newRemapKeys":"164;65"},{"originalKeys":"91;68","exactMatch":false,"operationType":0,"newRemapKeys":"164;68"},{"originalKeys":"91;70","exactMatch":false,"operationType":0,"newRemapKeys":"91;38"},{"originalKeys":"91;83","exactMatch":false,"operationType":0,"newRemapKeys":"91;40"},{"originalKeys":"91;87","exactMatch":false,"operationType":0,"newRemapKeys":"164;115"},{"originalKeys":"91;160;65","exactMatch":false,"operationType":0,"newRemapKeys":"164;160;65"},{"originalKeys":"91;160;68","exactMatch":false,"operationType":0,"newRemapKeys":"164;160;68"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
-            $fallback = '{"remapKeys":{"inProcess":[]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"91;32","exactMatch":true,"operationType":0,"newRemapKeys":"164;32"},{"originalKeys":"91;65","exactMatch":false,"operationType":0,"newRemapKeys":"164;65"},{"originalKeys":"91;68","exactMatch":false,"operationType":0,"newRemapKeys":"164;68"},{"originalKeys":"91;70","exactMatch":false,"operationType":0,"newRemapKeys":"91;38"},{"originalKeys":"91;83","exactMatch":false,"operationType":0,"newRemapKeys":"91;40"},{"originalKeys":"91;87","exactMatch":false,"operationType":0,"newRemapKeys":"164;115"},{"originalKeys":"91;160;65","exactMatch":false,"operationType":0,"newRemapKeys":"164;160;65"},{"originalKeys":"91;160;68","exactMatch":false,"operationType":0,"newRemapKeys":"164;160;68"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
+        $fallback = '{"remapKeys":{"inProcess":[]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"91;32","exactMatch":true,"operationType":0,"newRemapKeys":"164;32"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
+            $fallback = '{"remapKeys":{"inProcess":[]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"91;32","exactMatch":true,"operationType":0,"newRemapKeys":"164;32"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
         Set-Content -Path $defaultFile -Value $fallback -Encoding utf8
     }
-    $targetName = "Standard / Previous Layout"
+    $targetName = "External Keyboard (Win=SUPER)"
 } else {
     if (Test-Path $layoutRemapped) {
         Copy-Item $layoutRemapped $defaultFile -Force
     } else {
         # Fallback if layout_remapped.json doesn't exist
-        $fallback = '{"remapKeys":{"inProcess":[{"originalKeys":"20","newRemapKeys":"162"},{"originalKeys":"164","newRemapKeys":"91"},{"originalKeys":"91","newRemapKeys":"164"}]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"162;72","exactMatch":false,"newRemapKeys":"37"},{"originalKeys":"162;74","exactMatch":false,"newRemapKeys":"40"},{"originalKeys":"162;75","exactMatch":false,"newRemapKeys":"38"},{"originalKeys":"162;76","exactMatch":false,"newRemapKeys":"39"},{"originalKeys":"91;32","exactMatch":false,"operationType":0,"newRemapKeys":"164;32"},{"originalKeys":"91;65","exactMatch":false,"operationType":0,"newRemapKeys":"164;65"},{"originalKeys":"91;68","exactMatch":false,"operationType":0,"newRemapKeys":"164;68"},{"originalKeys":"91;70","exactMatch":false,"operationType":0,"newRemapKeys":"91;38"},{"originalKeys":"91;83","exactMatch":false,"operationType":0,"newRemapKeys":"91;40"},{"originalKeys":"91;87","exactMatch":false,"operationType":0,"newRemapKeys":"164;115"},{"originalKeys":"91;160;65","exactMatch":false,"operationType":0,"newRemapKeys":"164;160;65"},{"originalKeys":"91;160;68","exactMatch":false,"operationType":0,"newRemapKeys":"164;160;68"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
-            $fallback = '{"remapKeys":{"inProcess":[{"originalKeys":"20","newRemapKeys":"162"},{"originalKeys":"164","newRemapKeys":"91"},{"originalKeys":"91","newRemapKeys":"164"}]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"162;72","exactMatch":false,"newRemapKeys":"37"},{"originalKeys":"162;74","exactMatch":false,"newRemapKeys":"40"},{"originalKeys":"162;75","exactMatch":false,"newRemapKeys":"38"},{"originalKeys":"162;76","exactMatch":false,"newRemapKeys":"39"},{"originalKeys":"91;32","exactMatch":true,"operationType":0,"newRemapKeys":"164;32"},{"originalKeys":"91;65","exactMatch":false,"operationType":0,"newRemapKeys":"164;65"},{"originalKeys":"91;68","exactMatch":false,"operationType":0,"newRemapKeys":"164;68"},{"originalKeys":"91;70","exactMatch":false,"operationType":0,"newRemapKeys":"91;38"},{"originalKeys":"91;83","exactMatch":false,"operationType":0,"newRemapKeys":"91;40"},{"originalKeys":"91;87","exactMatch":false,"operationType":0,"newRemapKeys":"164;115"},{"originalKeys":"91;160;65","exactMatch":false,"operationType":0,"newRemapKeys":"164;160;65"},{"originalKeys":"91;160;68","exactMatch":false,"operationType":0,"newRemapKeys":"164;160;68"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
+        $fallback = '{"remapKeys":{"inProcess":[{"originalKeys":"164","newRemapKeys":"91"},{"originalKeys":"20","newRemapKeys":"162"},{"originalKeys":"91","newRemapKeys":"162"}]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"162;72","exactMatch":false,"newRemapKeys":"37"},{"originalKeys":"162;74","exactMatch":false,"newRemapKeys":"40"},{"originalKeys":"162;75","exactMatch":false,"newRemapKeys":"38"},{"originalKeys":"162;76","exactMatch":false,"newRemapKeys":"39"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
+            $fallback = '{"remapKeys":{"inProcess":[{"originalKeys":"164","newRemapKeys":"91"},{"originalKeys":"20","newRemapKeys":"162"},{"originalKeys":"91","newRemapKeys":"162"}]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"162;72","exactMatch":false,"newRemapKeys":"37"},{"originalKeys":"162;74","exactMatch":false,"newRemapKeys":"40"},{"originalKeys":"162;75","exactMatch":false,"newRemapKeys":"38"},{"originalKeys":"162;76","exactMatch":false,"newRemapKeys":"39"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
         Set-Content -Path $defaultFile -Value $fallback -Encoding utf8
     }
-    $targetName = "Remapped Layout (Caps/Alt/Win/Vim)"
+    $targetName = "Laptop (Alt=SUPER, Caps/Win=Ctrl, Ctrl+HJKL=Arrows)"
 }
 
 # Restart PowerToys KeyboardManagerEngine to reload configuration immediately

@@ -20,7 +20,7 @@ general:
 
   # Whether to switch back and forth between the previously focused
   # workspace when focusing the current workspace.
-  toggle_workspace_on_refocus: false
+  toggle_workspace_on_refocus: true
 
   cursor_jump:
     # Whether to automatically move the cursor on the specified trigger.
@@ -197,33 +197,23 @@ window_rules:
 keybindings:
   # Shift focus in a given direction.
   - commands: ['focus --direction left']
-    bindings: ['alt+h', 'alt+left']
+    bindings: ['win+h', 'win+left']
   - commands: ['focus --direction right']
-    bindings: ['alt+l', 'alt+right']
+    bindings: ['win+l', 'win+right']
   - commands: ['focus --direction up']
-    bindings: ['alt+k', 'alt+up']
+    bindings: ['win+k', 'win+up']
   - commands: ['focus --direction down']
-    bindings: ['alt+j', 'alt+down']
+    bindings: ['win+j', 'win+down']
 
   # Move focused window in a given direction.
   - commands: ['move --direction left']
-    bindings: ['alt+shift+h', 'alt+shift+left']
+    bindings: ['win+shift+h', 'win+shift+left']
   - commands: ['move --direction right']
-    bindings: ['alt+shift+l', 'alt+shift+right']
+    bindings: ['win+shift+l', 'win+shift+right']
   - commands: ['move --direction up']
-    bindings: ['alt+shift+k', 'alt+shift+up']
+    bindings: ['win+shift+k', 'win+shift+up']
   - commands: ['move --direction down']
-    bindings: ['alt+shift+j', 'alt+shift+down']
-
-  # Resize focused window by a percentage or pixel amount.
-  - commands: ['resize --width -2%']
-    bindings: ['alt+u']
-  - commands: ['resize --width +2%']
-    bindings: ['alt+p']
-  - commands: ['resize --height +2%']
-    bindings: ['alt+o']
-  - commands: ['resize --height -2%']
-    bindings: ['alt+i']
+    bindings: ['win+shift+j', 'win+shift+down']
 
   # As an alternative to the resize keybindings above, resize mode enables
   # resizing via arrow keys or HJKL. The binding mode is defined above with
@@ -234,12 +224,12 @@ keybindings:
   # Disables window management and all other keybindings until alt+shift+p
   # is pressed again.
   - commands: ['wm-toggle-pause']
-    bindings: ['alt+shift+p']
+    bindings: ['win+shift+p']
 
   # Change tiling direction. This determines where new tiling windows will
   # be inserted.
   - commands: ['toggle-tiling-direction']
-    bindings: ['alt+v']
+    bindings: ['win+backslash']
 
   # Change focus from tiling windows -> floating -> fullscreen.
   # - commands: ['wm-cycle-focus']
@@ -247,7 +237,7 @@ keybindings:
 
   # Change the focused window to be floating.
   - commands: ['toggle-floating --centered']
-    bindings: ['alt+shift+space']
+    bindings: ['win+t']
 
   # Toggle the visibility of Zebar's bar windows.
   - commands: ['shell-exec --hide-window cmd /c powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\toggle_zebar.ps1"']
@@ -256,21 +246,17 @@ keybindings:
   - commands: ['shell-exec --hide-window cmd /c python "%USERPROFILE%\.glzr\glazewm\focus_lock.py" --toggle']
     bindings: ['win+shift+o']
 
-  # Change the focused window to be tiling.
-  - commands: ['toggle-tiling']
-    bindings: ['win+t']
-
   # Change the focused window to be fullscreen.
-  # - commands: ['toggle-fullscreen']
-  #   bindings: ['win+f']
+  - commands: ['toggle-fullscreen']
+    bindings: ['win+f']
 
   # Minimize focused window.
   # - commands: ['toggle-minimized']
   #   bindings: ['win+m']
 
   # Close focused window.
-  # - commands: ['close']
-  #   bindings: ['alt+shift+q']
+  - commands: ['close']
+    bindings: ['win+w']
 
   # Kill GlazeWM process safely.
   - commands: ['wm-exit']
@@ -315,13 +301,13 @@ keybindings:
 
   # Focus the next/previous workspace defined in `workspaces` config.
   - commands: ['focus --next-workspace']
-    bindings: ['alt+d']
+    bindings: ['win+d']
   - commands: ['focus --prev-workspace']
-    bindings: ['alt+a']
+    bindings: ['win+a']
   - commands: ['move --prev-workspace', 'focus --prev-workspace']
-    bindings: ['alt+shift+a']
+    bindings: ['win+shift+a']
   - commands: ['move --next-workspace', 'focus --next-workspace']
-    bindings: ['alt+shift+d']
+    bindings: ['win+shift+d']
 
   # Focus the workspace that last had focus.
   # - commands: ['focus --recent-workspace']
@@ -329,7 +315,7 @@ keybindings:
 
   # Change focus to a workspace defined in `workspaces` config.
   - commands: ['focus --workspace 1']
-    bindings: ['win+1']
+    bindings: ['win+s']
   - commands: ['focus --workspace 2']
     bindings: ['win+2']
   - commands: ['focus --workspace 3']
@@ -373,4 +359,4 @@ keybindings:
   - commands: ['move --workspace 0', 'focus --workspace 0']
     bindings: ['win+shift+0']
   - commands: ['move --workspace S']
-    bindings: ['alt+win+s']
+    bindings: ['win+alt+s', 'win+ctrl+s']
