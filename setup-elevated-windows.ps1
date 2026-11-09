@@ -108,14 +108,25 @@ foreach ($exe in @{ 'glazewm.exe' = 3; 'AltSnap.exe' = 3; 'hyprwin.exe' = 3; 'ze
 Write-Host 'Raised the CPU priority of GlazeWM, AltSnap, hyprwin, Zebar and Flow Launcher.'
 
 # A normal process's keyboard hook and keys don't reach elevated windows, so SUPER opened Start over them.
-# `hyprwin.exe switcher` (started by GlazeWM) hands over to this elevated copy.
+# `hyprwin.exe switcher` (started by GlazeWM) hands over to this elevated copy. It's built into Program Files, which only
+# administrators can write to: an elevated task any process can start must not run a file any process can replace.
+# Re-run this script after editing hyprwin.cs to update the elevated copy.
+$elevatedDir = Join-Path $env:ProgramFiles 'hypr-win'
+$elevatedHyprwin = Join-Path $elevatedDir 'hyprwin.exe'
+$null = New-Item -ItemType Directory -Path $elevatedDir -Force
+Remove-Item "$elevatedHyprwin.*old" -ErrorAction SilentlyContinue
+if (Test-Path $elevatedHyprwin) { Move-Item $elevatedHyprwin "$elevatedHyprwin.$(Get-Random).old" -Force }
+& "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /optimize /target:winexe /r:System.Web.Extensions.dll `
+	"/out:$elevatedHyprwin" (Join-Path $PSScriptRoot '.glzr\glazewm\hyprwin.cs')
+if ($LASTEXITCODE) { throw 'Building the elevated hyprwin.exe failed.' }
 $switcherSettings = New-ScheduledTaskSettingsSet -MultipleInstances Parallel -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 1 `
 	-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 Register-ScheduledTask -TaskName 'Ryha hyprwin switcher' `
-	-Action (New-ScheduledTaskAction -Execute (Join-Path $env:USERPROFILE '.glzr\glazewm\hyprwin.exe') -Argument 'switcher') `
+	-Action (New-ScheduledTaskAction -Execute $elevatedHyprwin -Argument 'switcher') `
 	-Principal (New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest) `
 	-Settings $switcherSettings -Description 'Runs the hyprwin switcher elevated so its keys also work over elevated windows.' -Force | Out-Null
-Write-Host "Registered task 'Ryha hyprwin switcher'."
+Start-ScheduledTask -TaskName 'Ryha hyprwin switcher'
+Write-Host "Registered and started task 'Ryha hyprwin switcher'."
 
 # Run-key apps wait for Explorer's startup delay and start in no set order; logon tasks start right away.
 foreach ($app in @(
