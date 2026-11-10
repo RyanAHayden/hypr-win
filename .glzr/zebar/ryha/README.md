@@ -1,26 +1,44 @@
-# 
+# ryha
 
-Generated via SolidJS TypeScript template.
+The hypr-win Zebar bar, based on [Tokyo Silence](https://github.com/y4m3/zebar-tokyo-silence) by y4m3.
 
-## Usage
+![Preview](resources/preview.png)
 
-```bash
-$ npm install # or pnpm install or yarn install
+## Features
+
+- Thin, low-contrast bar designed to stay out of the way.
+- GlazeWM workspaces and tiling direction indicator.
+- Media title marquee with hover-only scroll and pause-aware behavior.
+- CPU/Mem/Battery/Network indicators.
+
+## Requirements
+
+- Zebar 3.2.0 or later
+
+## Install
+
+`copy_to_user_folder.bat` copies it to `~\.glzr\zebar\ryha`, and `../settings.json` starts it:
+
+```json
+{
+  "startupConfigs": [
+    {
+      "pack": "ryha",
+      "widget": "bar",
+      "preset": "default"
+    }
+  ]
+}
 ```
 
-### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
+## Customization
 
-## Available Scripts
+- Bar height: `--bar-item-height` in `bar/styles.css`
+- Marquee speed/gap: `--marquee-speed` / `--marquee-gap` in `bar/styles.css`
+- Colors: `:root` variables in `bar/styles.css`
 
-In the project directory, you can run:
+## License
 
-### `npm run dev`
+MIT. See `LICENSE`.
 
-Runs the app in the development mode.
-
-### `npm run build`
-
-Builds the app for production to the `dist` folder.<br>
-It bundles Solid in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.<br>
+Fonts are loaded via CDN; no font files are redistributed. See `licenses/NOTICE.txt`.
