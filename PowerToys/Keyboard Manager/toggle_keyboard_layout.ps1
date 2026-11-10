@@ -22,14 +22,42 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     exit $process.ExitCode
 }
 
+function Restart-KeyboardManager {
+    # At logon this can run before PowerToys starts its own engine; restarting first would leave two engines running.
+    if ($Action -eq 'reload' -and (Get-Process -Name 'PowerToys' -ErrorAction SilentlyContinue)) {
+        $deadline = (Get-Date).AddSeconds(15)
+        while (-not (Get-Process -Name 'PowerToys.KeyboardManagerEngine' -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    $engines = @(Get-Process -Name 'PowerToys.KeyboardManagerEngine' -ErrorAction SilentlyContinue)
+    $enginePath = $engines | ForEach-Object { $_.Path } | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+    if (-not $enginePath) {
+        $enginePath = @(
+            "$env:LOCALAPPDATA\PowerToys\KeyboardManagerEngine\PowerToys.KeyboardManagerEngine.exe",
+            "$env:ProgramFiles\PowerToys\PowerToys.KeyboardManagerEngine.exe",
+            "$env:ProgramFiles\PowerToys\KeyboardManagerEngine\PowerToys.KeyboardManagerEngine.exe"
+        ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    }
+    if (-not $enginePath) {
+        throw 'PowerToys Keyboard Manager engine was not found. Install PowerToys before reloading the keyboard layout.'
+    }
+    foreach ($engine in $engines) {
+        Stop-Process -Id $engine.Id -Force -ErrorAction SilentlyContinue
+        $engine.WaitForExit(2000) | Out-Null
+    }
+    $process = Start-Process -FilePath $enginePath -PassThru
+    Start-Sleep -Milliseconds 500
+    if ($process.HasExited) {
+        throw "PowerToys Keyboard Manager engine exited during startup (exit code $($process.ExitCode))."
+    }
+    # Every remapped key passes through the engine's hook; keep it ahead of busy apps.
+    try { $process.PriorityClass = 'High' } catch {}
+}
+
 if ($Action -eq 'reload') {
     # Keyboard Manager must hook after GlazeWM, or GlazeWM sees keys before they are remapped.
-    $engine = Get-Process -Name "PowerToys.KeyboardManagerEngine" -ErrorAction SilentlyContinue
-    if ($engine) {
-        $enginePath = $engine.Path
-        Stop-Process -Id $engine.Id -Force
-        Start-Process -FilePath $enginePath
-    }
+    Restart-KeyboardManager
     exit 0
 }
 
@@ -84,30 +112,7 @@ if ($isRemapped) {
 }
 
 # Restart PowerToys KeyboardManagerEngine to reload configuration immediately
-$kbmProc = Get-Process -Name "PowerToys.KeyboardManagerEngine" -ErrorAction SilentlyContinue
-$kbmPath = ""
-if ($kbmProc) {
-    $kbmPath = $kbmProc.Path
-    Stop-Process -Id $kbmProc.Id -Force
-}
-
-if (-not $kbmPath -or -not (Test-Path $kbmPath)) {
-    $candidates = @(
-        "$env:LOCALAPPDATA\PowerToys\KeyboardManagerEngine\PowerToys.KeyboardManagerEngine.exe",
-        "$env:ProgramFiles\PowerToys\PowerToys.KeyboardManagerEngine.exe",
-        "$env:ProgramFiles\PowerToys\KeyboardManagerEngine\PowerToys.KeyboardManagerEngine.exe"
-    )
-    foreach ($c in $candidates) {
-        if (Test-Path $c) {
-            $kbmPath = $c
-            break
-        }
-    }
-}
-
-if ($kbmPath -and (Test-Path $kbmPath)) {
-    Start-Process -FilePath $kbmPath
-}
+Restart-KeyboardManager
 
 # Show notification / toast
 try {

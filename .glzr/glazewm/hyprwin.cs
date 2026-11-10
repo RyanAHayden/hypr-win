@@ -50,8 +50,13 @@ static class HyprWin
 		// GlazeWM has uiAccess, which only the shell's launch path honours: started directly (as by Task Scheduler) it fails.
 		if (args.Length > 1 && args[0] == "launch")
 		{
-			Process.Start(new ProcessStartInfo(args[1], string.Join(" ", args, 2, args.Length - 2)) { UseShellExecute = true });
-			return 0;
+			using (var process = Process.Start(new ProcessStartInfo(args[1], string.Join(" ", args, 2, args.Length - 2)) { UseShellExecute = true }))
+			{
+				if (process == null) throw new InvalidOperationException("The shell did not return a process for " + args[1]);
+				// Keep the logon task attached so it can restart GlazeWM if startup fails.
+				process.WaitForExit();
+				return process.ExitCode;
+			}
 		}
 		try
 		{
@@ -438,11 +443,20 @@ static class HyprWin
 	{
 		if (!TakeOver("hyprwin-dwindle")) return 1;
 		Send("sub --events focus_changed window_managed window_unmanaged");
+		// Focus follows the cursor, so focus events are frequent: skip windows already split for their shape and parent.
+		var applied = new HashSet<string>();
 		while (true)
 		{
-			if (!Receive().Contains("\"event_subscription\"")) continue;
-			var focused = Map(Map(Query("focused"))["focused"]);
+			var text = Receive();
+			if (!text.Contains("\"event_subscription\"")) continue;
+			var data = Map(Map(json.DeserializeObject(text))["data"]);
+			Dictionary<string, object> focused = null;
+			if (data != null && "focus_changed".Equals(data["eventType"])) focused = Map(data["focusedContainer"]);
+			else focused = Map(Map(Query("focused"))["focused"]);
 			if (focused == null || (string)focused["type"] != "window" || State(focused) != "tiling") continue;
+			bool isWide = Convert.ToDouble(focused["width"]) >= Convert.ToDouble(focused["height"]);
+			var key = focused["id"] + "|" + focused["parentId"] + "|" + isWide;
+			if (applied.Contains(key)) continue;
 			// Changing splits would lose the spot GlazeWM returns a fullscreen window to.
 			var path = PathTo((string)focused["id"]);
 			if (path == null) continue;
@@ -450,8 +464,9 @@ static class HyprWin
 			foreach (var c in List(path[0]["children"]))
 				if ((string)Map(c)["type"] == "window" && State(Map(c)) == "fullscreen") hasFullscreen = true;
 			if (hasFullscreen) continue;
-			bool wide = Convert.ToDouble(focused["width"]) >= Convert.ToDouble(focused["height"]);
-			Command("--id " + focused["id"] + " set-tiling-direction " + (wide ? "horizontal" : "vertical"));
+			Command("--id " + focused["id"] + " set-tiling-direction " + (isWide ? "horizontal" : "vertical"));
+			if (applied.Count > 512) applied.Clear();
+			applied.Add(key);
 		}
 	}
 

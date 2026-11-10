@@ -99,12 +99,12 @@ Write-Host 'SSH remains managed by the sshd-user scheduled task; the sshd servic
 # Keep the window manager, bar, launcher and helpers responsive under load, however they're started.
 # CpuPriorityClass: 3 = high, 6 = above normal.
 $ifeo = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options'
-foreach ($exe in @{ 'glazewm.exe' = 3; 'AltSnap.exe' = 3; 'hyprwin.exe' = 3; 'zebar.exe' = 6; 'Flow.Launcher.exe' = 6 }.GetEnumerator()) {
+foreach ($exe in @{ 'glazewm.exe' = 3; 'AltSnap.exe' = 3; 'hyprwin.exe' = 3; 'PowerToys.KeyboardManagerEngine.exe' = 3; 'zebar.exe' = 6; 'Flow.Launcher.exe' = 6 }.GetEnumerator()) {
 	$key = "$ifeo\$($exe.Key)\PerfOptions"
 	if (-not (Test-Path $key)) { $null = New-Item $key -Force }
 	Set-ItemProperty $key CpuPriorityClass $exe.Value -Type DWord
 }
-Write-Host 'Raised the CPU priority of GlazeWM, AltSnap, hyprwin, Zebar and Flow Launcher.'
+Write-Host 'Raised the CPU priority of GlazeWM, AltSnap, hyprwin, Keyboard Manager, Zebar and Flow Launcher.'
 
 # A normal process's keyboard hook and keys don't reach elevated windows, so SUPER opened Start over them.
 # `hyprwin.exe switcher` (started by GlazeWM) hands over to this elevated copy. It's built into Program Files, which only
@@ -131,17 +131,26 @@ Write-Host "Registered and started task 'Ryha hyprwin switcher'."
 # GlazeWM has uiAccess, so Task Scheduler can't start it directly; the task starts it through hyprwin.exe launch.
 foreach ($app in @(
 	@{ Name = 'GlazeWM'; Path = "$env:ProgramFiles\glzr.io\GlazeWM\glazewm.exe"; Launcher = $elevatedHyprwin },
-	@{ Name = 'AltSnap'; Path = "$env:APPDATA\AltSnap\AltSnap.exe" }
+	@{ Name = 'AltSnap'; Path = "$env:APPDATA\AltSnap\AltSnap.exe" },
+	@{ Name = 'PowerToys'; Path = "$env:LOCALAPPDATA\PowerToys\PowerToys.exe"; Elevated = $true }
 )) {
 	if (-not (Test-Path $app.Path)) { continue }
 	$action = if ($app.Launcher) { New-ScheduledTaskAction -Execute $app.Launcher -Argument "launch `"$($app.Path)`"" }
 	else { New-ScheduledTaskAction -Execute $app.Path }
-	# Task priority 1 starts the app at high priority.
-	$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 1 `
+	# Task priority 1 starts GlazeWM and AltSnap at high priority; PowerToys keeps normal priority.
+	$priority = if ($app.Name -eq 'PowerToys') { 7 } else { 1 }
+	$runLevel = if ($app.Elevated) { 'Highest' } else { 'Limited' }
+	$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority $priority `
 		-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+	$trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
+	if ($app.Name -eq 'GlazeWM') {
+		$trigger.Delay = 'PT10S'
+		$settings.RestartCount = 3
+		$settings.RestartInterval = 'PT1M'
+	}
 	Register-ScheduledTask -TaskName "Ryha $($app.Name)" -Action $action `
-		-Trigger (New-ScheduledTaskTrigger -AtLogOn -User $user) `
-		-Principal (New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited) `
+		-Trigger $trigger `
+		-Principal (New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel $runLevel) `
 		-Settings $settings -Description "Starts $($app.Name) at logon." -Force | Out-Null
 	Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' $app.Name -ErrorAction SilentlyContinue
 	Write-Host "Registered logon task 'Ryha $($app.Name)'."

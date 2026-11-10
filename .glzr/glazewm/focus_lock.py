@@ -77,14 +77,44 @@ ZEBAR_CHECK_SECONDS = 5
 ZEBAR_MISSES_BEFORE_RESTART = 2
 
 
-def process_running(image_name):
-    output = subprocess.run(
-        ["tasklist", "/FI", f"IMAGENAME eq {image_name}", "/NH", "/FO", "CSV"],
-        capture_output=True,
-        text=True,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    ).stdout
-    return f'"{image_name.lower()}"' in output.lower()
+class PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", wintypes.DWORD),
+        ("cntUsage", wintypes.DWORD),
+        ("th32ProcessID", wintypes.DWORD),
+        ("th32DefaultHeapID", ctypes.c_size_t),
+        ("th32ModuleID", wintypes.DWORD),
+        ("cntThreads", wintypes.DWORD),
+        ("th32ParentProcessID", wintypes.DWORD),
+        ("pcPriClassBase", wintypes.LONG),
+        ("dwFlags", wintypes.DWORD),
+        ("szExeFile", wintypes.WCHAR * 260),
+    ]
+
+
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+INVALID_HANDLE_VALUE = wintypes.HANDLE(-1).value
+
+
+def running_processes():
+    # One in-process snapshot instead of spawning tasklist.
+    snapshot = kernel32.CreateToolhelp32Snapshot(0x2, 0)
+    if snapshot == INVALID_HANDLE_VALUE:
+        return None
+    names = set()
+    try:
+        entry = PROCESSENTRY32W(dwSize=ctypes.sizeof(PROCESSENTRY32W))
+        ok = kernel32.Process32FirstW(snapshot, ctypes.byref(entry))
+        while ok:
+            names.add(entry.szExeFile.lower())
+            ok = kernel32.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return names
 
 
 def start_zebar():
@@ -103,9 +133,10 @@ async def keep_zebar_running(stop_event):
     misses = 0
     while not stop_event.is_set():
         await asyncio.sleep(ZEBAR_CHECK_SECONDS)
-        zebar_running = await asyncio.to_thread(process_running, "zebar.exe")
-        glazewm_running = await asyncio.to_thread(process_running, "glazewm.exe")
-        if zebar_running or not glazewm_running:
+        names = await asyncio.to_thread(running_processes)
+        if names is None:
+            continue
+        if "zebar.exe" in names or "glazewm.exe" not in names:
             misses = 0
             continue
         misses += 1
@@ -233,20 +264,27 @@ async def handle_ipc(websocket, stop_event):
     await websocket.send("sub -e window_managed -e focus_changed")
     await websocket.send("q focused")
 
-    while not stop_event.is_set():
-        observed_revision = await sync_lock_state(
-            websocket, lock_state, observed_revision
-        )
-        try:
-            message = json.loads(await asyncio.wait_for(websocket.recv(), timeout=0.1))
-        except asyncio.TimeoutError:
-            continue
+    async def watch_lock_state():
+        nonlocal observed_revision
+        while True:
+            observed_revision = await sync_lock_state(
+                websocket, lock_state, observed_revision
+            )
+            await asyncio.sleep(0.1)
 
-        data = message.get("data") or {}
-        if message.get("messageType") == "client_response":
-            handle_focus_response(lock_state, data)
-        elif message.get("messageType") == "event_subscription":
-            await handle_event(websocket, lock_state, data, observed_revision)
+    watcher = asyncio.create_task(watch_lock_state())
+    try:
+        async for raw in websocket:
+            if stop_event.is_set():
+                break
+            message = json.loads(raw)
+            data = message.get("data") or {}
+            if message.get("messageType") == "client_response":
+                handle_focus_response(lock_state, data)
+            elif message.get("messageType") == "event_subscription":
+                await handle_event(websocket, lock_state, data, observed_revision)
+    finally:
+        watcher.cancel()
 
 
 async def run_ipc(stop_event):
