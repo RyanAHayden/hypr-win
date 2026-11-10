@@ -560,6 +560,10 @@ static class HyprWin
 
 		mainThread = GetCurrentThreadId();
 		Hook();
+		// AltSnap drags without focusing (focusing mid-drag stops GlazeWM's drag-to-swap), so raise the window instead.
+		// Raising without activating isn't a focus change, so GlazeWM leaves the drag alone.
+		const uint EVENT_SYSTEM_MOVESIZESTART = 0x000A, WINEVENT_OUTOFCONTEXT = 0, WINEVENT_SKIPOWNPROCESS = 2;
+		SetWinEventHook(EVENT_SYSTEM_MOVESIZESTART, EVENT_SYSTEM_MOVESIZESTART, IntPtr.Zero, moveStartProc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
 		MSG msg;
 		while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0)
 		{
@@ -572,6 +576,18 @@ static class HyprWin
 			}
 		}
 		return 0;
+	}
+
+	delegate void WinEventProc(IntPtr hook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
+	[DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr module, WinEventProc proc, uint process, uint thread, uint flags);
+	[DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+	static readonly WinEventProc moveStartProc = OnMoveStart;
+
+	static void OnMoveStart(IntPtr hook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
+	{
+		const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10, SWP_NOOWNERZORDER = 0x200;
+		if (idObject == 0 && hwnd != IntPtr.Zero)
+			SetWindowPos(hwnd, IntPtr.Zero /* HWND_TOP */, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 	}
 
 	static void Hook()
