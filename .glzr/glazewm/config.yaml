@@ -339,7 +339,7 @@ keybindings:
     bindings: ['win+shift+oem_question']
 
   # VS Code.
-  - commands: ['shell-exec "%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe"']
+  - commands: ['shell-exec code']
     bindings: ['win+shift+n']
 
   # Spotify.
