@@ -254,6 +254,12 @@ keybindings:
   - commands: ['resize --height +5%']
     bindings: ['win+shift+oem_plus']
 
+  # Display scaling of the focused window's monitor: bigger / more space.
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe scale up']
+    bindings: ['win+oem_question']
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe scale down']
+    bindings: ['win+alt+oem_question']
+
   # Change focus from tiling windows -> floating -> fullscreen.
   # - commands: ['wm-cycle-focus']
   #   bindings: ['alt+space']

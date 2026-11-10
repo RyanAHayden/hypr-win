@@ -54,6 +54,7 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | SUPER+Q | Quit the app (closes all its windows; it can still ask to save) |
 | SUPER+\ | Flip the split between the focused window and its neighbour (Hyprland's togglesplit) |
 | SUPER+- / = | Shrink / grow the window's width (with Shift: height) |
+| SUPER+/ , SUPER+Alt+/ | Display scaling of the focused window's monitor: bigger / more space, a step at a time (100%, 125%, 150%...) |
 | SUPER+Shift+Space | Toggle the Zebar bar |
 | SUPER+Shift+O | Toggle focus lock |
 | SUPER+Shift+P | Pause all GlazeWM binds |

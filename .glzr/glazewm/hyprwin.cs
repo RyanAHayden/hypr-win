@@ -11,6 +11,7 @@
 //   hyprwin togglescratchpad  SUPER+S: go to workspace S; on S, go back to the previous workspace
 //   hyprwin togglezebar       SUPER+SHIFT+SPACE: show / hide the Zebar bar
 //   hyprwin focuslock         SUPER+SHIFT+O: toggle focus_lock.py's lock (stops focus following the cursor)
+//   hyprwin scale up|down     SUPER+/ / SUPER+ALT+/: display scaling of the focused window's monitor, bigger / more space
 //   hyprwin launch <file> [args]  start a program through the shell; the logon task starts GlazeWM with it
 //   hyprwin togglesplit       SUPER+\: flip the split between the focused window and its sibling (Hyprland's togglesplit)
 //   hyprwin fullscreen [max]  toggle fullscreen (or maximized), returning the window to its old spot
@@ -45,6 +46,7 @@ static class HyprWin
 		if (args.Length > 0 && args[0] == "switcher") return Switcher();
 		if (args.Length > 0 && args[0] == "togglezebar") { ToggleZebar(); return 0; }
 		if (args.Length > 0 && args[0] == "focuslock") { ToggleFocusLock(); return 0; }
+		if (args.Length > 0 && args[0] == "scale") { ScaleDisplay(args.Length > 1 && args[1] == "down" ? -1 : 1); return 0; }
 		// GlazeWM has uiAccess, which only the shell's launch path honours: started directly (as by Task Scheduler) it fails.
 		if (args.Length > 1 && args[0] == "launch")
 		{
@@ -155,6 +157,66 @@ static class HyprWin
 		}, IntPtr.Zero);
 		bool show = bars.Exists(w => !IsWindowVisible(w));
 		foreach (var w in bars) ShowWindowAsync(w, show ? 5 : 0);
+	}
+
+	// --- Display scaling: the undocumented DisplayConfig DPI calls Settings > Display uses ---
+	[DllImport("user32.dll")] static extern int GetDisplayConfigBufferSizes(uint flags, out uint paths, out uint modes);
+	[DllImport("user32.dll")] static extern int QueryDisplayConfig(uint flags, ref uint paths, byte[] pathArray, ref uint modes, byte[] modeArray, IntPtr topology);
+	[DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo(byte[] packet);
+	[DllImport("user32.dll")] static extern int DisplayConfigSetDeviceInfo(byte[] packet);
+	[DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+	[DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetMonitorInfo(IntPtr monitor, byte[] info);
+
+	// Steps the scale of the focused window's monitor through Windows' list (100%, 125%, ...) by one, within its range.
+	static void ScaleDisplay(int step)
+	{
+		// MONITORINFOEX: cbSize, rcMonitor, rcWork, dwFlags, then the device name (\\.\DISPLAYn) at byte 40.
+		var monitorInfo = new byte[104];
+		BitConverter.GetBytes(monitorInfo.Length).CopyTo(monitorInfo, 0);
+		if (!GetMonitorInfo(MonitorFromWindow(GetForegroundWindow(), 2), monitorInfo)) return;
+		string device = Encoding.Unicode.GetString(monitorInfo, 40, 64).TrimEnd('\0');
+
+		const uint QDC_ONLY_ACTIVE_PATHS = 2;
+		const int PathSize = 72, ModeSize = 64;
+		uint pathCount, modeCount;
+		if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out pathCount, out modeCount) != 0) return;
+		var paths = new byte[pathCount * PathSize];
+		var modes = new byte[modeCount * ModeSize];
+		if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero) != 0) return;
+		for (int i = 0; i < pathCount; i++)
+		{
+			// A path starts with its source: adapter LUID (8 bytes), then source id.
+			var adapter = new byte[12];
+			Array.Copy(paths, i * PathSize, adapter, 0, 12);
+			var name = DeviceInfo(1, 84, adapter); // source name: GDI device name at byte 20
+			if (name == null || Encoding.Unicode.GetString(name, 20, 64).TrimEnd('\0') != device) continue;
+			var dpi = DeviceInfo(-3, 32, adapter); // DPI scale: min, current, max steps from the recommended one
+			if (dpi == null) return;
+			int min = BitConverter.ToInt32(dpi, 20), current = BitConverter.ToInt32(dpi, 24), max = BitConverter.ToInt32(dpi, 28);
+			int next = Math.Max(min, Math.Min(max, current + step));
+			if (next == current) return;
+			var set = Packet(-4, 24, adapter);
+			BitConverter.GetBytes(next).CopyTo(set, 20);
+			DisplayConfigSetDeviceInfo(set);
+			return;
+		}
+	}
+
+	// DISPLAYCONFIG_DEVICE_INFO_HEADER: type, size, adapter LUID and source id; the rest of the packet follows it.
+	static byte[] Packet(int type, int size, byte[] adapterAndSource)
+	{
+		var packet = new byte[size];
+		BitConverter.GetBytes(type).CopyTo(packet, 0);
+		BitConverter.GetBytes(size).CopyTo(packet, 4);
+		adapterAndSource.CopyTo(packet, 8);
+		return packet;
+	}
+
+	static byte[] DeviceInfo(int type, int size, byte[] adapterAndSource)
+	{
+		var packet = Packet(type, size, adapterAndSource);
+		return DisplayConfigGetDeviceInfo(packet) == 0 ? packet : null;
 	}
 
 	// focus_lock.py --service watches this file for a new revision.
@@ -444,7 +506,7 @@ static class HyprWin
 
 	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
 	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_F = 0x46, VK_INSERT = 0x2D;
-	const int VK_W = 0x57, VK_M = 0x4D, VK_S = 0x53, VK_O = 0x4F, VK_SPACE = 0x20, VK_BACKSLASH = 0xDC, VK_F13 = 0x7C, VK_F14 = 0x7D;
+	const int VK_W = 0x57, VK_M = 0x4D, VK_S = 0x53, VK_O = 0x4F, VK_SPACE = 0x20, VK_BACKSLASH = 0xDC, VK_SLASH = 0xBF, VK_F13 = 0x7C, VK_F14 = 0x7D;
 	const int VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3;
 	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_MENU = 0x12, VK_LMENU = 0xA4, VK_RMENU = 0xA5, VK_DUMMY = 0xFF;
 	const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2, WM_APP = 0x8000, WM_MODIFIER_DOWN = WM_APP + 1;
@@ -596,6 +658,7 @@ static class HyprWin
 			case VK_BACKSLASH: return shift || alt ? null : (Action)ToggleSplit;
 			case VK_SPACE: return shift && !alt ? (Action)ToggleZebar : null;
 			case VK_O: return shift && !alt ? (Action)ToggleFocusLock : null;
+			case VK_SLASH: return shift ? null : alt ? (Action)(() => ScaleDisplay(-1)) : () => ScaleDisplay(1);
 		}
 		return null;
 	}
