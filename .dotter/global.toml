@@ -23,8 +23,9 @@ default_target_type = "symbolic"
 "PowerToys/Keyboard Manager/toggle_keyboard_layout.ps1" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/toggle_keyboard_layout.ps1"
 "PowerToys/Keyboard Manager/toggle_keyboard_layout.bat" = "~/AppData/Local/Microsoft/PowerToys/Keyboard Manager/toggle_keyboard_layout.bat"
 
+# AltSnap.ini is left out: AltSnap doesn't read it through a symlink, and it runs elevated from Program Files.
+# setup-elevated-windows.ps1 deploys it. The empty package keeps existing local.toml files valid.
 [altsnap.files]
-"AltSnap.ini" = "~/AppData/Roaming/AltSnap/AltSnap.ini"
 
 [powershell.files]
 "PowerShell/profile_loader.ps1" = { target = "~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1", type = "template" }

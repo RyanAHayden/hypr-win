@@ -127,11 +127,25 @@ Register-ScheduledTask -TaskName 'Ryha hyprwin switcher' `
 Start-ScheduledTask -TaskName 'Ryha hyprwin switcher'
 Write-Host "Registered and started task 'Ryha hyprwin switcher'."
 
+# AltSnap runs elevated so it can drag admin windows. Like hyprwin, the elevated copy lives in Program Files, which only
+# administrators can write to. AltSnap.ini next to AltSnap.exe puts it in portable mode, so it reads the repo's config.
+# Re-run this script after editing AltSnap.ini or updating AltSnap.
+$altSnapSource = "$env:APPDATA\AltSnap"
+$altSnapDir = Join-Path $elevatedDir 'AltSnap'
+if (Test-Path "$altSnapSource\AltSnap.exe") {
+	Stop-ScheduledTask -TaskName 'Ryha AltSnap' -ErrorAction SilentlyContinue
+	Get-Process AltSnap -ErrorAction SilentlyContinue | Stop-Process -Force
+	Start-Sleep -Milliseconds 500
+	robocopy $altSnapSource $altSnapDir /E /XF AltSnap.ini /NFL /NDL /NJH /NJS | Out-Null
+	if ($LASTEXITCODE -ge 8) { throw 'Copying AltSnap to Program Files failed.' }
+	Copy-Item (Join-Path $PSScriptRoot 'AltSnap.ini') "$altSnapDir\AltSnap.ini" -Force
+}
+
 # Run-key apps wait for Explorer's startup delay and start in no set order; logon tasks start right away.
 # GlazeWM has uiAccess, so Task Scheduler can't start it directly; the task starts it through hyprwin.exe launch.
 foreach ($app in @(
 	@{ Name = 'GlazeWM'; Path = "$env:ProgramFiles\glzr.io\GlazeWM\glazewm.exe"; Launcher = $elevatedHyprwin },
-	@{ Name = 'AltSnap'; Path = "$env:APPDATA\AltSnap\AltSnap.exe" },
+	@{ Name = 'AltSnap'; Path = "$altSnapDir\AltSnap.exe"; Elevated = $true },
 	@{ Name = 'PowerToys'; Path = "$env:LOCALAPPDATA\PowerToys\PowerToys.exe"; Elevated = $true }
 )) {
 	if (-not (Test-Path $app.Path)) { continue }
