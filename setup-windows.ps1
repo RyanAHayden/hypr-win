@@ -63,7 +63,7 @@ if ((Get-ItemProperty $devKey -ErrorAction SilentlyContinue).AllowDevelopmentWit
 	Start-Process reg.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList 'add', 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock', '/v', 'AllowDevelopmentWithoutDevLicense', '/t', 'REG_DWORD', '/d', '1', '/f'
 }
 
-Write-Host 'Configuring OpenSSH (PowerShell 7 shell, sshd service) and registering elevated SSHD window hider and Ctrl+Caps Lock tasks...'
+Write-Host 'Configuring the OpenSSH shell (preserving sshd-user, not enabling the service) and registering elevated SSHD window hider and Ctrl+Caps Lock tasks...'
 $elevatedSetup = Join-Path $PSScriptRoot 'setup-elevated-windows.ps1'
 $isAdministrator = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if ($isAdministrator) {

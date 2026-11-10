@@ -45,3 +45,11 @@
 .dotter/local.toml
 .dotter/cache.toml
 .dotter/cache/
+
+# OpenSSH launcher: only source belongs in Git.
+/OpenSSH/ssh-no-window/build/
+/OpenSSH/ssh-no-window/*.exe
+/OpenSSH/ssh-no-window/*.o
+/OpenSSH/ssh-no-window/launcher.ini
+/OpenSSH/ssh-no-window/original-shell.txt
+/OpenSSH/ssh-no-window/backup-*/

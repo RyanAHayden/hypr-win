@@ -18,7 +18,7 @@ Install what you want manually or run the included `setup.bat`. It installs the 
 - Taskbar auto-hidden and left-aligned, no search box or Task View; dark mode, no transparency
 - File extensions and hidden files shown
 - Developer Mode on for Dotter symlinks (asks for administrator permission)
-- PowerShell 7 (Microsoft Store build) as the default Windows OpenSSH shell; a SYSTEM task re-points it at boot and hourly as Store updates change its path. The `sshd` service is set to Automatic and started
+- PowerShell 7 (Microsoft Store build) as the Windows OpenSSH shell; a SYSTEM task follows Store updates at boot and hourly, preserving the no-window launcher when installed. SSH stays managed by `sshd-user`; setup does not enable the `sshd` service
 - PSFzf installed; Windows Terminal set as the default terminal app with PowerShell 7 as its default profile
 - `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher and the dwindle tiler. The switcher also moves Start to SUPER+Alt, handles SUPER+C/V, and runs the helper binds (Alt+Tab cycle, SUPER+S/F/Q/\\ and friends, Zebar and focus-lock toggles) on an open GlazeWM connection, so they don't start a process per press; GlazeWM's binds for them are the fallback (re-run `setup-windows.ps1` after editing it)
 - An elevated, hidden-at-logon scheduled task keeps `sshd.exe` windows and their descendants hidden (asks for administrator permission)
@@ -148,6 +148,20 @@ winget install xanderfrangos.twinkletray
 
 # Shell
 `PowerShell/Microsoft.PowerShell_profile.ps1` gives PowerShell 7 the same Unix-style shell as [hypr-mac](https://github.com/RyanAHayden/hypr-mac)'s `.zshrc`. It is the `powershell` Dotter package, along with the shared `starship.toml`. Dotter deploys `PowerShell/profile_loader.ps1` as a plain file that dot-sources it, because Windows OpenSSH sessions refuse to follow user-created symlinks (the profile reads winget link targets directly over SSH for the same reason). `setup.bat` installs the tools it uses (fzf, PSFzf, zoxide, eza, bat, fd, starship, Neovim).
+
+## SSH without flashing console windows
+
+`OpenSSH\ssh-no-window` contains the launcher source, manifest, build script and passwordless SSH checks. It requires Windows 11 24H2 (build 26100) or later and MinGW-w64's `gcc` and `windres` on PATH. It prevents console creation for command SSH while preserving interactive terminals.
+
+With passwordless localhost SSH already working through the enabled `sshd-user` task and the `sshd` service stopped and disabled, run this from an elevated PowerShell window:
+
+```powershell
+.\OpenSSH\ssh-no-window\install.ps1
+```
+
+The installer builds from source, deploys to `%ProgramFiles%\hypr-win\ssh-no-window`, updates the shell-sync script, restarts only the task's listener and checks public-key command and interactive logins with password authentication disabled. Failed checks restore the previous setup. Use `-UserName` if the SSH login differs from the current Windows username.
+
+Only source is tracked: binaries, `launcher.ini`, shell-path backups and logs are generated locally, outside Git. No keys, passwords, usernames or machine-specific paths are included in the launcher source. Re-run `.\OpenSSH\ssh-no-window\verify.ps1` to check the installed setup.
 
 | Key / command | Action |
 |---|---|

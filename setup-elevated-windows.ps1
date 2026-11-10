@@ -94,8 +94,7 @@ Register-ElevatedPythonTask -TaskName 'Ryha Ctrl Caps Lock' `
 	-InstallName 'ctrl-caps-lock' `
 	-Description 'Makes physical Ctrl+Caps Lock toggle Caps Lock while Keyboard Manager maps Caps Lock to Ctrl.'
 
-Set-Service -Name sshd -StartupType Automatic
-Start-Service -Name sshd
+Write-Host 'SSH remains managed by the sshd-user scheduled task; the sshd service is not enabled.'
 
 # Keep the window manager, bar, launcher and helpers responsive under load, however they're started.
 # CpuPriorityClass: 3 = high, 6 = above normal.
