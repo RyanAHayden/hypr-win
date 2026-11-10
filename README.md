@@ -47,6 +47,7 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | SUPER+A / D | Previous / next workspace (with Shift: take the window) |
 | SUPER+S | Toggle scratchpad (workspace S) |
 | SUPER+Alt+S | Send window to the scratchpad and stay; on it, send the window back |
+| SUPER+Shift+S | Open the Windows screen snipping overlay |
 | SUPER+M / SUPER+Alt+M | Minimize / bring back a minimized window (this workspace's first) |
 | SUPER+F / SUPER+Alt+F | Maximize (bar stays visible) / fullscreen |
 | SUPER+T | Float |

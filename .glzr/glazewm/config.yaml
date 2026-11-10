@@ -273,6 +273,10 @@ keybindings:
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglezebar']
     bindings: ['win+shift+space']
 
+  # Open the Windows screen snipping overlay.
+  - commands: ['shell-exec explorer.exe ms-screenclip:']
+    bindings: ['win+shift+s']
+
   # Toggle focus lock (stops focus following the cursor).
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe focuslock']
     bindings: ['win+shift+o']
