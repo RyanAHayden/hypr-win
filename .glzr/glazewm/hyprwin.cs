@@ -665,6 +665,14 @@ static class HyprWin
 	static bool WmKey(int vk, bool up)
 	{
 		if (vk == wmKey) { if (up) wmKey = 0; return true; }
+		if (!up && vk == VK_S && SuperHeld() && GetAsyncKeyState(VK_SHIFT) < 0 &&
+			!AltHeld() && GetAsyncKeyState(VK_CONTROL) >= 0)
+		{
+			// Replay S with the modifiers intact so Windows handles its native screen-clipping shortcut.
+			wmKey = vk;
+			Tap(VK_S);
+			return true;
+		}
 		if (up) return false;
 		var action = WmAction(vk);
 		if (action == null) return false;
