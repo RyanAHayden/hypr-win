@@ -348,6 +348,10 @@ keybindings:
   - commands: ['shell-exec spotify:']
     bindings: ['win+shift+m']
 
+  # File Explorer.
+  - commands: ['shell-exec explorer.exe']
+    bindings: ['win+shift+f']
+
   # Key hints: search every keybind.
   - commands: ['shell-exec wt --title Keybinds --suppressApplicationTitle pwsh -NoProfile -ExecutionPolicy Bypass -File "%USERPROFILE%\.glzr\glazewm\keybinds.ps1"']
     bindings: ['win+i']

@@ -61,7 +61,7 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | SUPER+Shift+Space | Toggle the Zebar bar |
 | SUPER+Shift+O | Toggle focus lock |
 | SUPER+Shift+P | Pause all GlazeWM binds |
-| SUPER+Shift+Enter / B / N / M / / | Firefox / Edge / VS Code / Spotify / KeePassXC |
+| SUPER+Shift+Enter / B / N / M / F / | Firefox / Edge / VS Code / Spotify / File Explorer / KeePassXC |
 | Alt+Shift+R / W / E | Reload config / redraw / quit GlazeWM |
 
 Unlike Hyprland, GlazeWM has no hidden special workspace, so the scratchpad is the real workspace S.
