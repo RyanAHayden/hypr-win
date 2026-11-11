@@ -1,4 +1,4 @@
-@REM Installs and Windows settings for this config. Deploy the configs afterwards with Dotter or copy_to_user_folder.bat.
+@REM Installs for this config. Apply the Windows settings afterwards with setup-windows.ps1, then deploy the configs with Dotter or copy_to_user_folder.bat.
 
 @REM CONFIG
 winget install DEVCOM.JetBrainsMonoNerdFont
@@ -10,10 +10,10 @@ winget install Flow-Launcher.Flow-Launcher
 winget install glzr-io.glazewm
 winget install glzr-io.zebar
 winget install SuperCuber.Dotter
+winget install Greenshot.Greenshot
 
-@REM GlazeWM focus lock (Python + websockets) and Zebar widget build (Node)
+@REM GlazeWM focus lock (Python; setup-windows.ps1 adds websockets) and Zebar widget build (Node)
 winget install Python.Python.3.12
-py -3.12 -m pip install --user websockets
 winget install OpenJS.NodeJS.LTS
 
 @REM Shell (PowerShell 7 profile: fzf Ctrl+T/Ctrl+R/Alt+C, zoxide cd, eza ls, bat, starship)
@@ -42,8 +42,5 @@ winget install Spotify.Spotify
 @REM DEV
 winget install Microsoft.VisualStudioCode
 
-@REM Windows settings (Narrator off, accessibility shortcuts off, no Snap/animations, taskbar, Explorer, Developer Mode, PSFzf, Terminal default)
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-windows.ps1"
-
-ECHO done.
+ECHO done. Now run: powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-windows.ps1"
 pause

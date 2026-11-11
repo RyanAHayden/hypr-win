@@ -14,6 +14,7 @@
 //   hyprwin scale up|down     SUPER+/ / SUPER+ALT+/: display scaling of the focused window's monitor, bigger / more space
 //   hyprwin launch <file> [args]  start a program through the shell; the logon task starts GlazeWM with it
 //   hyprwin togglesplit       SUPER+\: flip the split between the focused window and its sibling (Hyprland's togglesplit)
+//   hyprwin move left|right|up|down  SUPER+SHIFT+HJKL: split the next window over with the focused one (Hyprland's movewindow)
 //   hyprwin fullscreen [max]  toggle fullscreen (or maximized), returning the window to its old spot
 //   hyprwin dwindle           stays running (GlazeWM startup): new windows split the focused one along its longer side
 //   hyprwin switcher          stays running (GlazeWM startup): SUPER+Tab window switcher; see the Switcher section.
@@ -70,6 +71,7 @@ static class HyprWin
 				case "scratchpad": Scratchpad(); break;
 				case "togglescratchpad": ToggleScratchpad(); break;
 				case "togglesplit": ToggleSplit(); break;
+				case "move": if (args.Length < 2) return 2; MoveWindow(args[1]); break;
 				case "fullscreen": Fullscreen(args.Length > 1 && args[1] == "max"); break;
 				case "dwindle": return Dwindle();
 				default: return 2;
@@ -296,6 +298,107 @@ static class HyprWin
 		return pair;
 	}
 
+	// Like Hyprland's dwindle movewindow: the window leaves its spot and splits the window next to it along that one's
+	// longer side. GlazeWM's own move would instead add it to the nearest ancestor tiling that way, e.g. as a new column.
+	static void MoveWindow(string direction)
+	{
+		var focused = Map(Map(Query("focused"))["focused"]);
+		var path = focused != null && (string)focused["type"] == "window" && State(focused) == "tiling" ? PathTo((string)focused["id"]) : null;
+		if (path == null) { Command("move --direction " + direction); return; }
+		var id = (string)focused["id"];
+		bool alongX = direction == "left" || direction == "right", backward = direction == "left" || direction == "up";
+		double x = Number(focused, "x"), y = Number(focused, "y"), width = Number(focused, "width"), height = Number(focused, "height");
+		double middle = alongX ? y + height / 2 : x + width / 2;
+
+		// The nearest tiling window in the direction, across from the window's middle.
+		var windows = new List<Dictionary<string, object>>();
+		CollectWindows(path[0], windows, c => State(c) == "tiling" && !id.Equals(c["id"]));
+		Dictionary<string, object> target = null;
+		double nearest = double.MaxValue;
+		foreach (var c in windows)
+		{
+			double cx = Number(c, "x"), cy = Number(c, "y"), cw = Number(c, "width"), ch = Number(c, "height");
+			double distance = alongX ? (backward ? x - (cx + cw) : cx - (x + width)) : (backward ? y - (cy + ch) : cy - (y + height));
+			double start = alongX ? cy : cx, end = alongX ? cy + ch : cx + cw;
+			if (distance < -1 || middle < start || middle > end || distance >= nearest) continue;
+			nearest = distance;
+			target = c;
+		}
+		// Nothing there: GlazeWM's move takes it to the next monitor.
+		if (target == null) { Command("move --direction " + direction); return; }
+		var targetId = (string)target["id"];
+
+		// Floating lifts the window out. Alone in a split, its old spot is gone, so GlazeWM retiles it beside the focused window.
+		if (TilingChildren(ParentOf(id)).Count > 1) Command("--id " + id + " toggle-tiling-direction");
+		// Float it where it is, so it doesn't pop out to the centre while the layout changes under it.
+		Command("--id " + id + " set-floating --centered=false --x-pos " + (int)x + " --y-pos " + (int)y
+			+ " --width " + (int)width + "px --height " + (int)height + "px");
+		var floatingPath = PathTo(id);
+		if (floatingPath != null) FlattenNestedSplits(floatingPath[0]);
+
+		// Split the target along its longer side, measured with the window gone, as dwindle does.
+		var targetPath = PathTo(targetId);
+		if (targetPath == null) { Command("--id " + id + " set-tiling"); return; }
+		target = targetPath[targetPath.Count - 1];
+		double tx = Number(target, "x"), ty = Number(target, "y"), tw = Number(target, "width"), th = Number(target, "height");
+		bool wide = tw >= th;
+		string split = wide ? "horizontal" : "vertical";
+		for (int i = 0; i < 4 && Direction(ParentOf(targetId)) != split; i++)
+			Command("--id " + targetId + " set-tiling-direction " + split);
+		targetPath = PathTo(targetId);
+		double share = TilingSize(targetPath[targetPath.Count - 1]);
+		bool hasSiblings = TilingChildren(targetPath[targetPath.Count - 2]).Count > 1;
+
+		Command("focus --container-id " + targetId);
+		Command("--id " + id + " set-tiling");
+		// Along the move it passes the target if the target took its spot, else stays on its side; across, its middle decides.
+		bool first;
+		if (wide == alongX)
+		{
+			double center = alongX ? x + width / 2 : y + height / 2;
+			bool tookSpot = alongX ? center >= tx && center <= tx + tw : center >= ty && center <= ty + th;
+			first = tookSpot == backward;
+		}
+		else first = middle < (alongX ? ty + th / 2 : tx + tw / 2);
+		if (first) Command("--id " + id + " move --direction " + (wide ? "left" : "up"));
+		// Sharing a parent with others, it took space from all of them: split only the target's.
+		if (hasSiblings) ResizePair(first ? id : targetId, first ? targetId : id, share / 2, share / 2, wide);
+		Command("focus --container-id " + id);
+	}
+
+	static double Number(Dictionary<string, object> container, string key) { return Convert.ToDouble(container[key]); }
+
+	// GlazeWM doesn't flatten the split a window leaves by turning floating (or fullscreen, minimized). If the remaining
+	// window is then wrapped twice, closing it leaves the outer split behind, empty but still taking up space.
+	static void FlattenNestedSplits(Dictionary<string, object> workspace)
+	{
+		for (int i = 0; i < 16 && workspace != null; i++)
+		{
+			var id = DoublyWrappedWindow(workspace, false);
+			if (id == null) return;
+			// Toggling an only child flattens its split.
+			Command("--id " + id + " toggle-tiling-direction");
+			var path = PathTo(id);
+			workspace = path == null ? null : path[0];
+		}
+	}
+
+	static string DoublyWrappedWindow(Dictionary<string, object> container, bool isOnlyChildOfSplit)
+	{
+		var children = TilingChildren(container);
+		bool isLoneSplit = (string)container["type"] == "split" && children.Count == 1;
+		foreach (var child in children)
+		{
+			if ((string)child["type"] == "window") { if (isLoneSplit && isOnlyChildOfSplit) return (string)child["id"]; }
+			else
+			{
+				var id = DoublyWrappedWindow(child, isLoneSplit);
+				if (id != null) return id;
+			}
+		}
+		return null;
+	}
+
 	// GlazeWM returns a window to its old split, but a single-window split dwindle wrapped it in is gone by then.
 	static void Fullscreen(bool maximized)
 	{
@@ -454,9 +557,6 @@ static class HyprWin
 			if (data != null && "focus_changed".Equals(data["eventType"])) focused = Map(data["focusedContainer"]);
 			else focused = Map(Map(Query("focused"))["focused"]);
 			if (focused == null || (string)focused["type"] != "window" || State(focused) != "tiling") continue;
-			bool isWide = Convert.ToDouble(focused["width"]) >= Convert.ToDouble(focused["height"]);
-			var key = focused["id"] + "|" + focused["parentId"] + "|" + isWide;
-			if (applied.Contains(key)) continue;
 			// Changing splits would lose the spot GlazeWM returns a fullscreen window to.
 			var path = PathTo((string)focused["id"]);
 			if (path == null) continue;
@@ -464,6 +564,10 @@ static class HyprWin
 			foreach (var c in List(path[0]["children"]))
 				if ((string)Map(c)["type"] == "window" && State(Map(c)) == "fullscreen") hasFullscreen = true;
 			if (hasFullscreen) continue;
+			FlattenNestedSplits(path[0]);
+			bool isWide = Convert.ToDouble(focused["width"]) >= Convert.ToDouble(focused["height"]);
+			var key = focused["id"] + "|" + focused["parentId"] + "|" + isWide;
+			if (applied.Contains(key)) continue;
 			Command("--id " + focused["id"] + " set-tiling-direction " + (isWide ? "horizontal" : "vertical"));
 			if (applied.Count > 512) applied.Clear();
 			applied.Add(key);
@@ -521,7 +625,7 @@ static class HyprWin
 
 	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
 	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_F = 0x46, VK_INSERT = 0x2D;
-	const int VK_W = 0x57, VK_M = 0x4D, VK_S = 0x53, VK_O = 0x4F, VK_SPACE = 0x20, VK_BACKSLASH = 0xDC, VK_SLASH = 0xBF, VK_F13 = 0x7C, VK_F14 = 0x7D;
+	const int VK_W = 0x57, VK_M = 0x4D, VK_S = 0x53, VK_O = 0x4F, VK_SPACE = 0x20, VK_BACKSLASH = 0xDC, VK_SLASH = 0xBF, VK_F13 = 0x7C, VK_F14 = 0x7D, VK_F22 = 0x85;
 	const int VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3;
 	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_MENU = 0x12, VK_LMENU = 0xA4, VK_RMENU = 0xA5, VK_DUMMY = 0xFF;
 	const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2, WM_APP = 0x8000, WM_MODIFIER_DOWN = WM_APP + 1;
@@ -668,9 +772,20 @@ static class HyprWin
 		if (!up && vk == VK_S && SuperHeld() && GetAsyncKeyState(VK_SHIFT) < 0 &&
 			!AltHeld() && GetAsyncKeyState(VK_CONTROL) >= 0)
 		{
-			// Replay S with the modifiers intact so Windows handles its native screen-clipping shortcut.
+			// Windows reserves Win+Shift+S, so Greenshot's region capture listens on plain F22 instead (F23/F24 are taken).
 			wmKey = vk;
-			Tap(VK_S);
+			bool lwin = GetAsyncKeyState(VK_LWIN) < 0, rwin = GetAsyncKeyState(VK_RWIN) < 0;
+			bool lshift = GetAsyncKeyState(VK_LSHIFT) < 0, rshift = GetAsyncKeyState(VK_RSHIFT) < 0;
+			Key(VK_DUMMY, false); Key(VK_DUMMY, true);
+			if (lwin) Key(VK_LWIN, true);
+			if (rwin) Key(VK_RWIN, true);
+			if (lshift) Key(VK_LSHIFT, true);
+			if (rshift) Key(VK_RSHIFT, true);
+			Tap(VK_F22);
+			if (lshift) Key(VK_LSHIFT, false);
+			if (rshift) Key(VK_RSHIFT, false);
+			if (lwin) Key(VK_LWIN, false);
+			if (rwin) Key(VK_RWIN, false);
 			return true;
 		}
 		if (up) return false;
@@ -695,6 +810,10 @@ static class HyprWin
 			case VK_M: return alt && !shift ? (Action)Unminimize : null;
 			case VK_S: return shift ? null : alt ? (Action)Scratchpad : ToggleScratchpad;
 			case VK_BACKSLASH: return shift || alt ? null : (Action)ToggleSplit;
+			case VK_H: case VK_LEFT: return shift && !alt ? (Action)(() => MoveWindow("left")) : null;
+			case VK_L: case VK_RIGHT: return shift && !alt ? (Action)(() => MoveWindow("right")) : null;
+			case VK_K: case VK_UP: return shift && !alt ? (Action)(() => MoveWindow("up")) : null;
+			case VK_J: case VK_DOWN: return shift && !alt ? (Action)(() => MoveWindow("down")) : null;
 			case VK_SPACE: return shift && !alt ? (Action)ToggleZebar : null;
 			case VK_O: return shift && !alt ? (Action)ToggleFocusLock : null;
 			case VK_SLASH: return shift ? null : alt ? (Action)(() => ScaleDisplay(-1)) : () => ScaleDisplay(1);

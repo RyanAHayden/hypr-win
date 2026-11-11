@@ -7,12 +7,12 @@ My [Omarchy](https://omarchy.org)-style tiling setup on Windows, the Windows sib
 - **Workspaces** 1-10 plus a scratchpad (S), which is the laptop screen's workspace when docked
 - **Workspace bar** drawn by Zebar
 - **Unix-style shell**: PowerShell 7 in Windows Terminal with fzf, zoxide, eza, starship and zsh-like history search
-- **One command**: `setup.bat` installs everything and applies the Windows settings
+- **Two steps**: `installs.bat` installs everything, `setup-windows.ps1` applies the Windows settings
 
 !! GlazeWM Zebar themes are not changed by `CHANGE_COLORS.md` yet.
 
 # Setup
-Install what you want manually or run the included `setup.bat`. It installs the apps and tools below, then runs `setup-windows.ps1` to apply the Windows settings this config expects:
+Install what you want manually or run the included `installs.bat`, which installs the apps and tools below. Then run `powershell -NoProfile -ExecutionPolicy Bypass -File setup-windows.ps1` to apply the Windows settings this config expects (safe to re-run):
 - Narrator, its Ctrl+Win+Enter shortcut and blue focus box off; Sticky/Filter/Toggle Keys shortcuts off
 - Snap, window arrangement and animations off (GlazeWM tiles instead)
 - Taskbar auto-hidden and left-aligned, no search box or Task View; dark mode, no transparency
@@ -20,8 +20,10 @@ Install what you want manually or run the included `setup.bat`. It installs the 
 - Developer Mode on for Dotter symlinks (asks for administrator permission)
 - PowerShell 7 (Microsoft Store build) as the Windows OpenSSH shell; a SYSTEM task follows Store updates at boot and hourly, preserving the no-window launcher when installed. SSH stays managed by `sshd-user`; setup does not enable the `sshd` service
 - PSFzf installed; Windows Terminal set as the default terminal app with PowerShell 7 as its default profile
+- Python `websockets` installed for the GlazeWM focus lock
 - `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher and the dwindle tiler. The switcher also moves Start to SUPER+Alt, handles SUPER+C/V, and runs the helper binds (Alt+Tab cycle, SUPER+S/F/Q/\\ and friends, Zebar and focus-lock toggles) on an open GlazeWM connection, so they don't start a process per press; GlazeWM's binds for them are the fallback (re-run `setup-windows.ps1` after editing it)
 - An elevated, hidden-at-logon scheduled task keeps `sshd.exe` windows and their descendants hidden (asks for administrator permission)
+- Greenshot started at logon and set to region-capture to the clipboard on F22, which hyprwin sends for SUPER+Shift+S (Windows reserves Win+Shift+S for Snipping Tool)
 - An elevated logon task (`PowerToys/Keyboard Manager/ctrl_caps_lock.py`) makes physical Ctrl+Caps Lock toggle Caps Lock, even while Caps Lock is remapped to Ctrl
 - GlazeWM, AltSnap and PowerToys start from logon tasks instead of the Run key (PowerToys and AltSnap run elevated for remapping and dragging admin windows), and Flow Launcher's logon task loses its delay. GlazeWM waits 10 seconds for the desktop to settle and retries failures up to three times at one-minute intervals; GlazeWM, AltSnap, hyprwin and the Keyboard Manager engine run at high CPU priority, Zebar and Flow Launcher above normal; and the hyprwin switcher runs elevated (through a task) so SUPER binds work, and SUPER alone doesn't open Start, over admin windows (asks for administrator permission)
 - A virtual display (`install-virtual-display.ps1`, cloned with the built-in screen) so Sunshine/Moonlight still works with the lid closed; set the lid to "Do nothing" with Flow Launcher's **Toggle Lid Sleep**
@@ -47,7 +49,7 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | SUPER+A / D | Previous / next workspace (with Shift: take the window) |
 | SUPER+S | Toggle scratchpad (workspace S) |
 | SUPER+Alt+S | Send window to the scratchpad and stay; on it, send the window back |
-| SUPER+Shift+S | Open the Windows screen snipping overlay |
+| SUPER+Shift+S | Greenshot region capture to the clipboard (hyprwin sends F22, Greenshot's `RegionHotkey`) |
 | SUPER+M / SUPER+Alt+M | Minimize / bring back a minimized window (this workspace's first) |
 | SUPER+F / SUPER+Alt+F | Maximize (bar stays visible) / fullscreen |
 | SUPER+T | Float |
@@ -148,7 +150,7 @@ winget install xanderfrangos.twinkletray
 ```
 
 # Shell
-`PowerShell/Microsoft.PowerShell_profile.ps1` gives PowerShell 7 the same Unix-style shell as [hypr-mac](https://github.com/RyanAHayden/hypr-mac)'s `.zshrc`. It is the `powershell` Dotter package, along with the shared `starship.toml`. Dotter deploys `PowerShell/profile_loader.ps1` as a plain file that dot-sources it, because Windows OpenSSH sessions refuse to follow user-created symlinks (the profile reads winget link targets directly over SSH for the same reason). `setup.bat` installs the tools it uses (fzf, PSFzf, zoxide, eza, bat, fd, starship, Neovim).
+`PowerShell/Microsoft.PowerShell_profile.ps1` gives PowerShell 7 the same Unix-style shell as [hypr-mac](https://github.com/RyanAHayden/hypr-mac)'s `.zshrc`. It is the `powershell` Dotter package, along with the shared `starship.toml`. Dotter deploys `PowerShell/profile_loader.ps1` as a plain file that dot-sources it, because Windows OpenSSH sessions refuse to follow user-created symlinks (the profile reads winget link targets directly over SSH for the same reason). `installs.bat` installs the tools it uses (fzf, PSFzf, zoxide, eza, bat, fd, starship, Neovim).
 
 ## SSH without flashing console windows
 

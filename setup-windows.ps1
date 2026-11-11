@@ -1,4 +1,4 @@
-# Windows settings for this config. Run by setup.bat; safe to re-run.
+# Windows settings for this config. Run after installs.bat; safe to re-run.
 
 function Set-Reg($Path, $Name, $Value, $Type = 'DWord') {
 	if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
@@ -91,6 +91,31 @@ if ($LASTEXITCODE) {
 	# Restart the switcher and dwindle through GlazeWM so they run elevated like GlazeWM (the new ones replace the old).
 	glazewm command shell-exec --hide-window '%USERPROFILE%\.glzr\glazewm\hyprwin.exe' switcher 2>$null | Out-Null
 	glazewm command shell-exec --hide-window '%USERPROFILE%\.glzr\glazewm\hyprwin.exe' dwindle 2>$null | Out-Null
+}
+
+Write-Host 'Setting up Greenshot for SUPER+Shift+S (hyprwin sends F22; Windows reserves Win+Shift+S, F23/F24 are often taken)...'
+$greenshot = "$env:ProgramFiles\Greenshot\Greenshot.exe"
+if (Test-Path $greenshot) {
+	# Greenshot rewrites Greenshot.ini when it exits normally, so kill it before editing.
+	Stop-Process -Name Greenshot -Force -ErrorAction SilentlyContinue
+	$greenshotDir = "$env:APPDATA\Greenshot"
+	New-Item -ItemType Directory -Force $greenshotDir | Out-Null
+	Set-Content "$greenshotDir\Greenshot-defaults.ini" "[Core]`r`nLanguage=en-US`r`nIsFirstLaunch=false`r`nRegionHotkey=F22`r`nDestinations=Clipboard"
+	$greenshotIni = "$greenshotDir\Greenshot.ini"
+	if (Test-Path $greenshotIni) {
+		(Get-Content $greenshotIni) -replace '^RegionHotkey=.*', 'RegionHotkey=F22' -replace '^Destinations=.*', 'Destinations=Clipboard' | Set-Content $greenshotIni
+	}
+	Set-Reg 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' Greenshot "`"$greenshot`"" String
+	Start-Process $greenshot
+} else {
+	Write-Host '  Greenshot not installed (installs.bat); SUPER+Shift+S does nothing until it is.'
+}
+
+Write-Host 'Installing websockets for the GlazeWM focus lock (Python 3.12)...'
+if (Get-Command py -ErrorAction SilentlyContinue) {
+	py -3.12 -m pip install --user --quiet websockets
+} else {
+	Write-Host '  Python launcher not found; run installs.bat, open a new terminal and re-run setup.'
 }
 
 Write-Host 'Installing PSFzf for PowerShell 7...'

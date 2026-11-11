@@ -221,13 +221,14 @@ keybindings:
     bindings: ['win+j', 'win+down']
 
   # Move focused window in a given direction.
-  - commands: ['move --direction left']
+  # Hyprland-style: the window splits the next window over.
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe move left']
     bindings: ['win+shift+h', 'win+shift+left']
-  - commands: ['move --direction right']
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe move right']
     bindings: ['win+shift+l', 'win+shift+right']
-  - commands: ['move --direction up']
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe move up']
     bindings: ['win+shift+k', 'win+shift+up']
-  - commands: ['move --direction down']
+  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe move down']
     bindings: ['win+shift+j', 'win+shift+down']
 
   # As an alternative to the resize keybindings above, resize mode enables
@@ -272,10 +273,6 @@ keybindings:
   # Toggle Zebar's bar windows.
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglezebar']
     bindings: ['win+shift+space']
-
-  # Open the Windows screen snipping overlay.
-  - commands: ['shell-exec explorer.exe ms-screenclip:']
-    bindings: ['win+shift+s']
 
   # Toggle focus lock (stops focus following the cursor).
   - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe focuslock']
