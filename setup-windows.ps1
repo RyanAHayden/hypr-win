@@ -48,13 +48,35 @@ Write-Host 'Showing file extensions and hidden files...'
 Set-Reg "$explorer\Advanced" HideFileExt 0
 Set-Reg "$explorer\Advanced" Hidden 1
 
-Write-Host 'Starting Flow Launcher right at logon, at raised priority...'
-# GlazeWM's and AltSnap's logon tasks need admin rights, so setup-elevated-windows.ps1 registers them. its own logon task (it rewrites it on updates); drop its delay and raise its priority.
-$flowTask = Get-ScheduledTask 'Flow.Launcher Startup' -ErrorAction SilentlyContinue
-if ($flowTask) {
-	$flowTask.Triggers[0].Delay = 'PT0S'
-	$flowTask.Settings.Priority = 2
-	Set-ScheduledTask -InputObject $flowTask | Out-Null
+Write-Host 'Setting up Vicinae (SUPER+Space launcher) and keeping Flow Launcher off its shortcut...'
+# Vicinae merges Vicinae/hypr-win.jsonc (linked by the vicinae Dotter package) through an import in its settings.json, which
+# its settings window rewrites, so only the import is added here. It starts at logon from the Run key.
+$vicinaeServer = "$env:LOCALAPPDATA\Programs\Vicinae\bin\vicinae-server.exe"
+if (Test-Path $vicinaeServer) {
+	$vicinaeConfig = "$env:LOCALAPPDATA\vicinae\config"
+	$vicinaeSettings = "$vicinaeConfig\settings.json"
+	New-Item -ItemType Directory -Force $vicinaeConfig | Out-Null
+	if (-not (Test-Path $vicinaeSettings)) {
+		Set-Content $vicinaeSettings "{`r`n`t`"imports`": [`"hypr-win.jsonc`"]`r`n}"
+	} else {
+		$settings = Get-Content $vicinaeSettings -Raw
+		if ($settings -notmatch '"hypr-win\.jsonc"') {
+			$settings = if ($settings -match '"imports"\s*:\s*\[') {
+				[regex]::Replace($settings, '("imports"\s*:\s*\[)', '$1"hypr-win.jsonc", ', 1)
+			} else {
+				([regex]'\{').Replace($settings, "{`r`n`t`"imports`": [`"hypr-win.jsonc`"],", 1)
+			}
+			Set-Content $vicinaeSettings $settings -NoNewline
+		}
+	}
+	Set-Reg 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' Vicinae "`"$vicinaeServer`"" String
+	# Flow Launcher's own logon task would take Alt+Space (SUPER+Space) first.
+	$flowTask = Get-ScheduledTask 'Flow.Launcher Startup' -ErrorAction SilentlyContinue
+	if ($flowTask) { Disable-ScheduledTask -InputObject $flowTask | Out-Null }
+	Get-Process Flow.Launcher -ErrorAction SilentlyContinue | Stop-Process
+	if (-not (Get-Process vicinae-server -ErrorAction SilentlyContinue)) { Start-Process $vicinaeServer }
+} else {
+	Write-Host '  Vicinae is not installed (installs.bat); skipped.'
 }
 
 Write-Host 'Enabling Developer Mode (needed for Dotter symlinks)...'

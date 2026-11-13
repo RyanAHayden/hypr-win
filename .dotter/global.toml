@@ -30,3 +30,18 @@ default_target_type = "symbolic"
 [powershell.files]
 "PowerShell/profile_loader.ps1" = { target = "~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1", type = "template" }
 "PowerShell/starship.toml" = "~/.config/starship.toml"
+
+# Vicinae: hypr-win.jsonc is imported by its settings.json (setup-windows.ps1), and the Script Commands go in its
+# default script folder. The power-* ones are also the SUPER+Escape menu (hyprwin powermenu).
+[vicinae.files]
+"Vicinae/hypr-win.jsonc" = "~/AppData/Local/vicinae/config/hypr-win.jsonc"
+"Vicinae/scripts/create-app-shortcut.ps1" = "~/AppData/Local/vicinae/data/scripts/create-app-shortcut.ps1"
+"Vicinae/scripts/power-hibernate.ps1" = "~/AppData/Local/vicinae/data/scripts/power-hibernate.ps1"
+"Vicinae/scripts/power-lid-sleep.ps1" = "~/AppData/Local/vicinae/data/scripts/power-lid-sleep.ps1"
+"Vicinae/scripts/power-lock.ps1" = "~/AppData/Local/vicinae/data/scripts/power-lock.ps1"
+"Vicinae/scripts/power-logout.ps1" = "~/AppData/Local/vicinae/data/scripts/power-logout.ps1"
+"Vicinae/scripts/power-relaunch-wm.ps1" = "~/AppData/Local/vicinae/data/scripts/power-relaunch-wm.ps1"
+"Vicinae/scripts/power-reopen-apps.ps1" = "~/AppData/Local/vicinae/data/scripts/power-reopen-apps.ps1"
+"Vicinae/scripts/power-restart.ps1" = "~/AppData/Local/vicinae/data/scripts/power-restart.ps1"
+"Vicinae/scripts/power-shutdown.ps1" = "~/AppData/Local/vicinae/data/scripts/power-shutdown.ps1"
+"Vicinae/scripts/power-sleep.ps1" = "~/AppData/Local/vicinae/data/scripts/power-sleep.ps1"

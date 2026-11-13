@@ -1,0 +1,21 @@
+// hypr-win's Vicinae settings, the Windows sibling of hypr-mac's Raycast setup. Vicinae imports this file from its
+// settings.json (setup-windows.ps1 adds the import) and never writes to it; changes made in Vicinae's settings window go
+// to settings.json and win over these. SUPER+Space is bound in hyprwin (vicinae://toggle): Windows keeps Win+Space, so
+// Vicinae's own toggle shortcut stays at its Windows default, Alt+Space.
+{
+	// minimal launcher: compact window (no suggestions until you type) and no favorites
+	"launcher_window": {
+		"compact_mode": {
+			"enabled": true
+		}
+	},
+	"favorites": [],
+
+	// reopening always lands on root search, never inside a command like clipboard history
+	"pop_to_root_on_close": true,
+
+	// no tray icon (hypr-mac hides Raycast's menu bar icon)
+	"tray": {
+		"enabled": false
+	}
+}

@@ -43,7 +43,30 @@ foreach ($line in Get-Content $config) {
 	}
 }
 
-$rows += [pscustomobject]@{ Keys = 'SUPER + TAB'; Description = 'Window switcher, all windows: hold SUPER; Tab / Shift back / H J K L move / Q close'; Command = 'hyprwin.exe switcher' }
+# Binds the hyprwin switcher handles itself (no GlazeWM bind, see config.yaml), in the same Keys/Description/Command shape.
+$hyprwin = @(
+	,@('SUPER + TAB', 'Window switcher, all windows: hold SUPER; Tab / Shift back / H J K L move / Q close', 'switcher')
+	,@('SUPER + SPACE', 'Vicinae launcher (again closes it)', 'vicinae://toggle')
+	,@('SUPER + CTRL + V', 'Vicinae clipboard history', 'vicinae://launch/clipboard/history')
+	,@('SUPER + CTRL + E', 'Vicinae emoji picker', 'vicinae://launch/core/search-emojis')
+	,@('SUPER + ESC', 'System menu: lock, sleep, hibernate, keep awake, relaunch, log out, restart, shut down', 'powermenu')
+	,@('SUPER + SHIFT + H/J/K/L  /  SUPER + SHIFT + arrows', 'Move window: it splits the next window over (Hyprland-style)', 'move')
+	,@('SUPER + \', 'Flip the split between the focused window and its sibling', 'togglesplit')
+	,@('SUPER + /  /  SUPER + ALT + /', "Display scaling of the focused window's monitor: bigger / more space", 'scale up / scale down')
+	,@('SUPER + SHIFT + SPACE', "Toggle Zebar's bar windows", 'togglezebar')
+	,@('SUPER + SHIFT + O', 'Toggle focus lock (stops focus following the cursor)', 'focuslock')
+	,@('SUPER + F', 'Maximize the focused window (the bar stays visible)', 'fullscreen max')
+	,@('SUPER + ALT + F', 'Make the focused window fullscreen (covers the bar)', 'fullscreen')
+	,@('ALT + TAB  /  ALT + SHIFT + TAB', 'Next / previous window on this workspace (PowerToys sends F13 / F14)', 'cycle next / cycle prev')
+	,@('SUPER + ALT + M', "Bring back a minimized window, preferring this workspace's", 'unminimize')
+	,@('SUPER + SHIFT + W', "Force kill the focused window's app", 'kill')
+	,@('SUPER + Q', "Quit the focused window's app (closes all its windows; it can still ask to save)", 'quit')
+	,@('SUPER + S', 'Toggle the scratchpad workspace without toggling regular workspaces', 'togglescratchpad')
+	,@('SUPER + ALT + S', 'Send the focused window to the scratchpad; on it, send the window back', 'scratchpad')
+)
+foreach ($bind in $hyprwin) {
+	$rows += [pscustomobject]@{ Keys = $bind[0]; Description = $bind[1]; Command = "hyprwin.exe $($bind[2])" }
+}
 
 $width = ($rows.Keys | Measure-Object -Maximum Length).Maximum + 3
 $lines = $rows | ForEach-Object { $_.Keys.PadRight($width) + $_.Description + "  `e[90m" + $_.Command + "`e[0m" }

@@ -16,13 +16,15 @@
 //   hyprwin togglesplit       SUPER+\: flip the split between the focused window and its sibling (Hyprland's togglesplit)
 //   hyprwin move left|right|up|down  SUPER+SHIFT+HJKL: split the next window over with the focused one (Hyprland's movewindow)
 //   hyprwin fullscreen [max]  toggle fullscreen (or maximized), returning the window to its old spot
+//   hyprwin powermenu         SUPER+ESC: system menu (lock, sleep, hibernate, keep awake, relaunch, log out, restart, shut down)
 //   hyprwin dwindle           stays running (GlazeWM startup): new windows split the focused one along its longer side
 //   hyprwin switcher          stays running (GlazeWM startup): SUPER+Tab window switcher; see the Switcher section.
 //                             It also stops SUPER alone opening Start; tapping SUPER+Alt opens it instead.
-//                             SUPER+C / SUPER+V copy / paste everywhere; SUPER+Ctrl+V opens clipboard history.
+//                             SUPER+C / SUPER+V copy / paste everywhere. SUPER+Space, SUPER+Ctrl+V and SUPER+Ctrl+E open
+//                             Vicinae, its clipboard history and its emoji picker.
 //                             SUPER+F / SUPER+ALT+F run fullscreen max / fullscreen without starting a process.
 //                             The switcher also runs every bind above without starting a process (~100 ms each);
-//                             GlazeWM's binds for them only run if the switcher isn't.
+//                             GlazeWM has no binds for them: they would fire as well when its hook runs first.
 //                             Starting either again replaces the running one.
 using System;
 using System.Collections;
@@ -45,6 +47,7 @@ static class HyprWin
 	static int Main(string[] args)
 	{
 		if (args.Length > 0 && args[0] == "switcher") return Switcher();
+		if (args.Length > 0 && args[0] == "powermenu") return PowerMenu();
 		if (args.Length > 0 && args[0] == "togglezebar") { ToggleZebar(); return 0; }
 		if (args.Length > 0 && args[0] == "focuslock") { ToggleFocusLock(); return 0; }
 		if (args.Length > 0 && args[0] == "scale") { ScaleDisplay(args.Length > 1 && args[1] == "down" ? -1 : 1); return 0; }
@@ -605,6 +608,135 @@ static class HyprWin
 		return true;
 	}
 
+	// --- Power menu: SUPER+Escape, like hypr-mac's power-menu.swift ---
+	// A native menu centered on the screen with the mouse: the underlined letters or arrows/Enter pick an item, Escape
+	// closes it. The actions are the "Power:" Script Commands (%LOCALAPPDATA%\vicinae\data\scripts\power-*.ps1, from
+	// Vicinae/scripts), so they're also searchable in Vicinae. Picking a toggle (check mark) reopens the menu.
+
+	[DllImport("user32.dll")] static extern IntPtr CreatePopupMenu();
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool AppendMenu(IntPtr menu, uint flags, UIntPtr id, string text);
+	[DllImport("user32.dll")] static extern bool DestroyMenu(IntPtr menu);
+	[DllImport("user32.dll")] static extern int TrackPopupMenuEx(IntPtr menu, uint flags, int x, int y, IntPtr hwnd, IntPtr parameters);
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr CreateWindowEx(uint exStyle, string className, string title, uint style,
+		int x, int y, int width, int height, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr parameter);
+	[DllImport("user32.dll")] static extern bool DestroyWindow(IntPtr hwnd);
+	[DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
+	[DllImport("user32.dll")] static extern bool GetCursorPos(out long point);
+	[DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(long point, uint flags);
+	[DllImport("uxtheme.dll", EntryPoint = "#135")] static extern int SetPreferredAppMode(int mode);
+	[DllImport("uxtheme.dll", EntryPoint = "#136")] static extern void FlushMenuThemes();
+
+	static readonly string[][] PowerItems =
+	{
+		new[] { "&Lock", "power-lock.ps1" },
+		new[] { "&Sleep", "power-sleep.ps1" },
+		new[] { "&Hibernate", "power-hibernate.ps1" },
+		new[] { "&Keep Awake With Lid Closed", "power-lid-sleep.ps1" },
+		new[] { "Reopen &Apps at Login", "power-reopen-apps.ps1" },
+		null,
+		new[] { "Relaunch &Window Manager", "power-relaunch-wm.ps1" },
+		null,
+		new[] { "Log &Out", "power-logout.ps1" },
+		new[] { "&Restart", "power-restart.ps1" },
+		new[] { "Shut &Down", "power-shutdown.ps1" },
+	};
+
+	// Runs a Vicinae deeplink (https://docs.vicinae.com/deeplinks), as hypr-mac's binds do with raycast:// links.
+	static void Vicinae(string link)
+	{
+		string exe = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\Vicinae\bin\vicinae.exe");
+		try { using (Process.Start(new ProcessStartInfo(exe, "\"" + link + "\"") { CreateNoWindow = true, UseShellExecute = false })) { } }
+		catch (Exception) { }
+	}
+
+	static int PowerMenu()
+	{
+		bool first;
+		using (new System.Threading.Mutex(true, "hyprwin-powermenu", out first))
+		{
+			if (!first) return 0;
+			string scripts = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"vicinae\data\scripts");
+			// Dark menus when Windows is in dark mode.
+			try { SetPreferredAppMode(1); FlushMenuThemes(); } catch (Exception) { }
+			while (true)
+			{
+				string script = PickPower();
+				if (script == null) return 0;
+				RunScript(Path.Combine(scripts, script));
+				if (script != "power-lid-sleep.ps1" && script != "power-reopen-apps.ps1") return 0;
+			}
+		}
+	}
+
+	static string PickPower()
+	{
+		var menu = CreatePopupMenu();
+		const uint MF_STRING = 0, MF_SEPARATOR = 0x800, MF_CHECKED = 8;
+		for (int i = 0; i < PowerItems.Length; i++)
+		{
+			var item = PowerItems[i];
+			if (item == null) { AppendMenu(menu, MF_SEPARATOR, UIntPtr.Zero, null); continue; }
+			bool on = item[1] == "power-lid-sleep.ps1" ? LidStaysAwake() : item[1] == "power-reopen-apps.ps1" && ReopensApps();
+			AppendMenu(menu, MF_STRING | (on ? MF_CHECKED : 0), (UIntPtr)(i + 1), item[0]);
+		}
+
+		// The menu takes keys only while its owner is the foreground window. A key sent from here makes this process the
+		// last to give input, which lets it take the foreground (PowerToys and the switcher skip keys with our flag).
+		var owner = CreateWindowEx(0x80 /* WS_EX_TOOLWINDOW */, "STATIC", "hyprwin power menu", 0x80000000 /* WS_POPUP */,
+			0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+		keybd_event(0xFF, 0, 0, new UIntPtr((ulong)OurFlag));
+		keybd_event(0xFF, 0, 2, new UIntPtr((ulong)OurFlag));
+		SetForegroundWindow(owner);
+
+		// The center of the work area of the monitor with the mouse (MONITORINFO: rcWork at byte 20).
+		long cursor;
+		GetCursorPos(out cursor);
+		var info = new byte[40];
+		BitConverter.GetBytes(info.Length).CopyTo(info, 0);
+		GetMonitorInfo(MonitorFromPoint(cursor, 2), info);
+		int x = (BitConverter.ToInt32(info, 20) + BitConverter.ToInt32(info, 28)) / 2;
+		int y = (BitConverter.ToInt32(info, 24) + BitConverter.ToInt32(info, 32)) / 2;
+
+		const uint TPM_CENTERALIGN = 0x4, TPM_VCENTERALIGN = 0x10, TPM_NONOTIFY = 0x80, TPM_RETURNCMD = 0x100;
+		int picked = TrackPopupMenuEx(menu, TPM_CENTERALIGN | TPM_VCENTERALIGN | TPM_NONOTIFY | TPM_RETURNCMD, x, y, owner, IntPtr.Zero);
+		PostMessage(owner, 0 /* WM_NULL */, IntPtr.Zero, IntPtr.Zero);
+		DestroyMenu(menu);
+		DestroyWindow(owner);
+		return picked > 0 ? PowerItems[picked - 1][1] : null;
+	}
+
+	static void RunScript(string path)
+	{
+		var info = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + path + "\"")
+			{ CreateNoWindow = true, UseShellExecute = false };
+		using (var process = Process.Start(info)) process.WaitForExit();
+	}
+
+	[DllImport("powrprof.dll")] static extern uint PowerGetActiveScheme(IntPtr rootKey, out IntPtr scheme);
+	[DllImport("powrprof.dll")] static extern uint PowerReadACValueIndex(IntPtr rootKey, IntPtr scheme, ref Guid subgroup, ref Guid setting, out uint value);
+	[DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr memory);
+
+	// Lid close does nothing (Keep Awake With Lid Closed is on) when its AC action is 0.
+	static bool LidStaysAwake()
+	{
+		IntPtr scheme;
+		if (PowerGetActiveScheme(IntPtr.Zero, out scheme) != 0) return false;
+		try
+		{
+			var buttons = new Guid("4f971e89-eebd-4455-a8de-9e59040e7347");
+			var lidAction = new Guid("5ca83367-6e45-459f-a27b-476b1d01c936");
+			uint value;
+			return PowerReadACValueIndex(IntPtr.Zero, scheme, ref buttons, ref lidAction, out value) == 0 && value == 0;
+		}
+		finally { LocalFree(scheme); }
+	}
+
+	static bool ReopensApps()
+	{
+		using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion\Winlogon"))
+			return key != null && 1.Equals(key.GetValue("RestartApps"));
+	}
+
 	// --- Switcher: SUPER+Tab, hypr-mac style ---
 	// Holding SUPER, Tab opens the Windows Alt+Tab switcher (sent as Alt+Tab) and moves forward; tapping Shift, or Shift+Tab,
 	// moves back; H/J/K/L move left/down/up/right; Q closes the highlighted window. Releasing SUPER picks the window.
@@ -623,8 +755,8 @@ static class HyprWin
 	[DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 	[StructLayout(LayoutKind.Sequential)] struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam, lParam; public uint time; public int x, y; }
 
-	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
-	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_F = 0x46, VK_INSERT = 0x2D;
+	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_ESCAPE = 0x1B, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
+	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_F = 0x46, VK_E = 0x45, VK_INSERT = 0x2D;
 	const int VK_W = 0x57, VK_M = 0x4D, VK_S = 0x53, VK_O = 0x4F, VK_SPACE = 0x20, VK_BACKSLASH = 0xDC, VK_SLASH = 0xBF, VK_F13 = 0x7C, VK_F14 = 0x7D, VK_F22 = 0x85;
 	const int VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3;
 	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_MENU = 0x12, VK_LMENU = 0xA4, VK_RMENU = 0xA5, VK_DUMMY = 0xFF;
@@ -737,24 +869,14 @@ static class HyprWin
 	}
 
 	// SUPER+C / SUPER+V send Ctrl+Insert / Shift+Insert (copy / paste in terminals too) with Win briefly let go.
-	// SUPER+Ctrl+V sends Win+V (clipboard history), then lets Win go so its release can't close the history.
+	// (SUPER+Ctrl+V is Vicinae's clipboard history, in WmAction.)
 	static bool ClipboardKey(int vk, bool up)
 	{
 		if (vk == clipboardKey) { if (up) clipboardKey = 0; return true; }
 		if (up || (vk != VK_C && vk != VK_V) || !SuperHeld()) return false;
-		bool ctrl = GetAsyncKeyState(VK_CONTROL) < 0;
-		if (ctrl && vk == VK_C) return false;
+		if (GetAsyncKeyState(VK_CONTROL) < 0) return false;
 		clipboardKey = vk;
 		bool lwin = GetAsyncKeyState(VK_LWIN) < 0, rwin = GetAsyncKeyState(VK_RWIN) < 0;
-		if (ctrl)
-		{
-			if (GetAsyncKeyState(VK_LCONTROL) < 0) Key(VK_LCONTROL, true);
-			if (GetAsyncKeyState(VK_RCONTROL) < 0) Key(VK_RCONTROL, true);
-			Tap(VK_V);
-			if (lwin) Key(VK_LWIN, true);
-			if (rwin) Key(VK_RWIN, true);
-			return true;
-		}
 		Key(VK_DUMMY, false); Key(VK_DUMMY, true);
 		if (lwin) Key(VK_LWIN, true);
 		if (rwin) Key(VK_RWIN, true);
@@ -800,8 +922,16 @@ static class HyprWin
 	{
 		if (vk == VK_F13) return () => Cycle(1);
 		if (vk == VK_F14) return () => Cycle(-1);
-		if (!SuperHeld() || GetAsyncKeyState(VK_CONTROL) < 0) return null;
+		if (!SuperHeld()) return null;
 		bool shift = GetAsyncKeyState(VK_SHIFT) < 0, alt = AltHeld();
+		if (GetAsyncKeyState(VK_CONTROL) < 0)
+		{
+			// hypr-mac's launcher binds: SUPER+Ctrl+V clipboard history, SUPER+Ctrl+E emoji picker.
+			if (shift || alt) return null;
+			if (vk == VK_V) return () => Vicinae("vicinae://launch/clipboard/history?toggle=true");
+			if (vk == VK_E) return () => Vicinae("vicinae://launch/core/search-emojis?toggle=true");
+			return null;
+		}
 		switch (vk)
 		{
 			case VK_F: return shift ? null : alt ? (Action)(() => Fullscreen(false)) : () => Fullscreen(true);
@@ -814,9 +944,14 @@ static class HyprWin
 			case VK_L: case VK_RIGHT: return shift && !alt ? (Action)(() => MoveWindow("right")) : null;
 			case VK_K: case VK_UP: return shift && !alt ? (Action)(() => MoveWindow("up")) : null;
 			case VK_J: case VK_DOWN: return shift && !alt ? (Action)(() => MoveWindow("down")) : null;
-			case VK_SPACE: return shift && !alt ? (Action)ToggleZebar : null;
+			// SUPER+Space: Windows keeps Win+Space for itself, so Vicinae can't take it; PowerToys doesn't chain its
+			// Win+Space -> Alt+Space remap onto the Win it makes from left Alt either.
+			case VK_SPACE: return alt ? null : shift ? (Action)ToggleZebar : () => Vicinae("vicinae://toggle");
 			case VK_O: return shift && !alt ? (Action)ToggleFocusLock : null;
 			case VK_SLASH: return shift ? null : alt ? (Action)(() => ScaleDisplay(-1)) : () => ScaleDisplay(1);
+			// Its own process, so the menu's modal loop never blocks this hook; GlazeWM fires its bind only on release.
+			case VK_ESCAPE: return shift || alt ? null : (Action)(() => Process.Start(new ProcessStartInfo(
+				Process.GetCurrentProcess().MainModule.FileName, "powermenu") { UseShellExecute = false }).Dispose());
 		}
 		return null;
 	}

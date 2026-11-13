@@ -7,6 +7,8 @@ winget install AltSnap.AltSnap
 winget install xanderfrangos.twinkletray
 winget install Microsoft.PowerToys
 winget install Flow-Launcher.Flow-Launcher
+@REM Vicinae: Raycast-style launcher configured from files (Vicinae/); runs the "Power: ..." Script Commands in Vicinae/scripts
+winget install Vicinae.Vicinae
 winget install glzr-io.glazewm
 winget install glzr-io.zebar
 winget install SuperCuber.Dotter

@@ -220,17 +220,6 @@ keybindings:
   - commands: ['focus --direction down']
     bindings: ['win+j', 'win+down']
 
-  # Move focused window in a given direction.
-  # Hyprland-style: the window splits the next window over.
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe move left']
-    bindings: ['win+shift+h', 'win+shift+left']
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe move right']
-    bindings: ['win+shift+l', 'win+shift+right']
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe move up']
-    bindings: ['win+shift+k', 'win+shift+up']
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe move down']
-    bindings: ['win+shift+j', 'win+shift+down']
-
   # As an alternative to the resize keybindings above, resize mode enables
   # resizing via arrow keys or HJKL. The binding mode is defined above with
   # the name 'resize'.
@@ -242,10 +231,6 @@ keybindings:
   - commands: ['wm-toggle-pause']
     bindings: ['win+shift+p']
 
-  # Flip the split between the focused window and its sibling.
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglesplit']
-    bindings: ['win+oem_pipe']
-
   # Resize the focused window: SUPER+-/= width, with Shift height.
   - commands: ['resize --width -5%']
     bindings: ['win+oem_minus']
@@ -256,12 +241,6 @@ keybindings:
   - commands: ['resize --height +5%']
     bindings: ['win+shift+oem_plus']
 
-  # Display scaling of the focused window's monitor: bigger / more space.
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe scale up']
-    bindings: ['win+oem_question']
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe scale down']
-    bindings: ['win+alt+oem_question']
-
   # Change focus from tiling windows -> floating -> fullscreen.
   # - commands: ['wm-cycle-focus']
   #   bindings: ['alt+space']
@@ -270,48 +249,22 @@ keybindings:
   - commands: ['toggle-floating --centered']
     bindings: ['win+t']
 
-  # Toggle Zebar's bar windows.
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglezebar']
-    bindings: ['win+shift+space']
-
-  # Toggle focus lock (stops focus following the cursor).
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe focuslock']
-    bindings: ['win+shift+o']
-
-  # Maximize the focused window (the bar stays visible).
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe fullscreen max']
-    bindings: ['win+f']
-  # Make the focused window fullscreen (covers the bar).
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe fullscreen']
-    bindings: ['win+alt+f']
-
-  # Next window on this workspace (PowerToys turns Alt+Tab into F13; SUPER+Tab is the Windows switcher).
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe cycle next']
-    bindings: ['f13']
-  # Previous window on this workspace (PowerToys turns Alt+Shift+Tab into F14).
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe cycle prev']
-    bindings: ['f14']
-
   # Minimize the focused window.
   - commands: ['toggle-minimized']
     bindings: ['win+m']
-  # Bring back a minimized window, preferring this workspace's.
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe unminimize']
-    bindings: ['win+alt+m']
 
   # Close focused window.
   - commands: ['close']
     bindings: ['win+w']
-  # Force kill the focused window's app.
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe kill']
-    bindings: ['win+shift+w']
-  # Quit the focused window's app (closes all its windows; it can still ask to save).
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe quit']
-    bindings: ['win+q']
 
   # Kill GlazeWM process safely.
   - commands: ['wm-exit']
     bindings: ['alt+shift+e']
+
+  # The hyprwin switcher (hyprwin.cs, WmAction) handles SUPER+Shift+HJKL/arrows, SUPER+\, SUPER+/ and SUPER+Alt+/,
+  # SUPER+Shift+Space, SUPER+Shift+O, SUPER+F / SUPER+Alt+F, Alt+Tab (F13/F14), SUPER+Alt+M, SUPER+Shift+W, SUPER+Q,
+  # SUPER+S / SUPER+Alt+S, SUPER+Escape, SUPER+Space and SUPER+Ctrl+V/E itself. They have no GlazeWM binds here: when
+  # GlazeWM's keyboard hook runs before hyprwin's (after a config reload), both would fire. keybinds.ps1 lists them.
 
   # Re-evaluate configuration file.
   - commands: ['wm-reload-config']
@@ -401,13 +354,6 @@ keybindings:
     bindings: ['win+9']
   - commands: ['focus --workspace 0']
     bindings: ['win+0']
-
-  # Toggle the scratchpad workspace without toggling regular workspaces.
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe togglescratchpad']
-    bindings: ['win+s']
-  # Send the focused window to the scratchpad; on it, send the window back.
-  - commands: ['shell-exec --hide-window %USERPROFILE%\.glzr\glazewm\hyprwin.exe scratchpad']
-    bindings: ['win+alt+s']
 
   # Move focused window to a workspace defined in `workspaces` config.
   - commands: ['move --workspace 1', 'focus --workspace 1']

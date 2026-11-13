@@ -21,7 +21,7 @@ Install what you want manually or run the included `installs.bat`, which install
 - PowerShell 7 (Microsoft Store build) as the Windows OpenSSH shell; a SYSTEM task follows Store updates at boot and hourly, preserving the no-window launcher when installed. SSH stays managed by `sshd-user`; setup does not enable the `sshd` service
 - PSFzf installed; Windows Terminal set as the default terminal app with PowerShell 7 as its default profile
 - Python `websockets` installed for the GlazeWM focus lock
-- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher and the dwindle tiler. The switcher also moves Start to SUPER+Alt, handles SUPER+C/V, and runs the helper binds (Alt+Tab cycle, SUPER+S/F/Q/\\ and friends, Zebar and focus-lock toggles) on an open GlazeWM connection, so they don't start a process per press; GlazeWM's binds for them are the fallback (re-run `setup-windows.ps1` after editing it)
+- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher and the dwindle tiler. The switcher also moves Start to SUPER+Alt, handles SUPER+C/V, and runs the helper binds (Alt+Tab cycle, SUPER+S/F/Q/\\ and friends, Zebar and focus-lock toggles) on an open GlazeWM connection, so they don't start a process per press. Those binds, SUPER+Space/Ctrl+V/Ctrl+E (Vicinae) and SUPER+Escape (system menu) are only in the switcher: GlazeWM copies would fire as well whenever GlazeWM's keyboard hook runs first (re-run `setup-windows.ps1` after editing it)
 - An elevated, hidden-at-logon scheduled task keeps `sshd.exe` windows and their descendants hidden (asks for administrator permission)
 - Greenshot started at logon and set to region-capture to the clipboard on F22, which hyprwin sends for SUPER+Shift+S (Windows reserves Win+Shift+S for Snipping Tool)
 - An elevated logon task (`PowerToys/Keyboard Manager/ctrl_caps_lock.py`) makes physical Ctrl+Caps Lock toggle Caps Lock, even while Caps Lock is remapped to Ctrl
@@ -37,7 +37,8 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | SUPER+I | Key hints: search every keybind (fzf) |
 | SUPER+Alt (tap together) | Start menu (SUPER alone no longer opens it) |
 | SUPER+C / SUPER+V | Copy / paste everywhere, terminals included (sent as Ctrl+Insert / Shift+Insert) |
-| SUPER+Ctrl+V | Clipboard history |
+| SUPER+Space | Vicinae launcher (again closes it) |
+| SUPER+Ctrl+V / SUPER+Ctrl+E | Vicinae clipboard history / emoji picker |
 | Ctrl+Caps Lock | Toggle Caps Lock (turns it off if it gets stuck on) |
 | SUPER+Enter | Terminal (Windows Terminal, PowerShell 7) |
 | SUPER+H/J/K/L or arrows | Focus left / down / up / right |
@@ -61,6 +62,7 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | SUPER+Shift+Space | Toggle the Zebar bar |
 | SUPER+Shift+O | Toggle focus lock |
 | SUPER+Shift+P | Pause all GlazeWM binds |
+| SUPER+Escape | System menu (centered): lock, sleep, hibernate, keep awake with lid closed, reopen apps at login, relaunch GlazeWM, log out, restart, shut down. Also in Vicinae as "Power: ..." |
 | SUPER+Shift+Enter / B / N / M / F / | Firefox / Edge / VS Code / Spotify / File Explorer / KeePassXC |
 | Alt+Shift+R / W / E | Reload config / redraw / quit GlazeWM |
 
@@ -101,6 +103,14 @@ winget install AltSnap.AltSnap
 
 ### Config:
 The included `AltSnap.ini` is deployed by `setup-elevated-windows.ps1`, which copies AltSnap into `Program Files\hypr-win\AltSnap` with the ini beside it and runs it elevated so it can drag admin windows (re-run it after editing the ini or updating AltSnap). It drags with SUPER or Alt (on the laptop layout, physical Alt is SUPER), keeps Aero/side snapping, right-click combos (SideSnap, edge extend, scroll zoom) and resize-all, and ignores Zebar.
+
+## < [Vicinae](https://vicinae.com) >
+```
+winget install Vicinae.Vicinae
+```
+
+### Config:
+Vicinae stands in for hypr-mac's Raycast, and everything about it comes from files, so setup applies it all. `Vicinae/hypr-win.jsonc` (compact window, no favorites, back to root search on close, no tray icon) is imported by Vicinae's `settings.json`, which `setup-windows.ps1` points at it; settings changed in Vicinae's own window go to `settings.json` and win over it. The `Power: ...` Script Commands in `Vicinae/scripts` are hypr-mac's Raycast ones, ported (Vicinae reads `@raycast` directives); the `vicinae` Dotter package links them into Vicinae's script folder, and SUPER+Escape runs the same scripts from a native menu (`hyprwin powermenu`). hyprwin runs Vicinae's [deeplinks](https://docs.vicinae.com/deeplinks) for SUPER+Space, SUPER+Ctrl+V and SUPER+Ctrl+E like hypr-mac's binds: Windows keeps Win+Space for itself, so no launcher can register SUPER+Space directly. Setup starts Vicinae at logon and disables Flow Launcher's logon task, which would take Alt+Space.
 
 ## < [WindHawk](https://windhawk.net/) >
 ```
