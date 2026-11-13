@@ -18,6 +18,7 @@ Install what you want manually or run the included `installs.bat`, which install
 - Taskbar auto-hidden and left-aligned, no search box or Task View; dark mode, no transparency
 - File extensions and hidden files shown
 - Developer Mode on for Dotter symlinks (asks for administrator permission)
+- Hibernate on and shown in Start's power menu (asks for administrator permission)
 - PowerShell 7 (Microsoft Store build) as the Windows OpenSSH shell; a SYSTEM task follows Store updates at boot and hourly, preserving the no-window launcher when installed. SSH stays managed by `sshd-user`; setup does not enable the `sshd` service
 - PSFzf installed; Windows Terminal set as the default terminal app with PowerShell 7 as its default profile
 - Python `websockets` installed for the GlazeWM focus lock

@@ -24,6 +24,14 @@ Register-ScheduledTask -TaskName $syncTaskName -Action $syncAction -Trigger $syn
 	-Description 'Points the OpenSSH DefaultShell at the current PowerShell 7 install.' -Force | Out-Null
 Write-Host "Registered task '$syncTaskName'."
 
+# Hibernate on, and in Start's power menu (like hypr-mac's system menu, SUPER+Escape has Hibernate too).
+& "$env:SystemRoot\System32\powercfg.exe" /hibernate on
+if ($LASTEXITCODE) { throw "powercfg /hibernate on failed with exit code $LASTEXITCODE." }
+$flyout = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings'
+$null = New-Item -Path $flyout -Force
+New-ItemProperty -LiteralPath $flyout -Name ShowHibernateOption -PropertyType DWord -Value 1 -Force | Out-Null
+Write-Host 'Enabled Hibernate and its power-menu entry.'
+
 $python = Get-Command python.exe -ErrorAction Stop
 $runtimePath = & $python.Source -c 'import sys; print(sys.executable)'
 if ($LASTEXITCODE -ne 0 -or -not $runtimePath) {
