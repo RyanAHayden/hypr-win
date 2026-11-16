@@ -279,8 +279,8 @@ keybindings:
   - commands: ['shell-exec msedge']
     bindings: ['win+shift+b']
 
-  # KeePassXC.
-  - commands: ['shell-exec "%USERPROFILE%\KeePassXC.lnk"']
+  # KeePassXC. GlazeWM 3.10 can't parse a quoted program path, so this one (no spaces) stays bare.
+  - commands: ['shell-exec %USERPROFILE%\KeePassXC.lnk']
     bindings: ['win+shift+oem_question']
 
   # VS Code.
