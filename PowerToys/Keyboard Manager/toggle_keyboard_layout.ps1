@@ -14,7 +14,9 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
         $arguments += " -Action `"$Action`""
     }
     try {
-        $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+        $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -PassThru
+        # -Wait also waits for the long-lived Keyboard Manager child.
+        $process.WaitForExit()
     } catch [System.ComponentModel.Win32Exception] {
         Write-Error "Keyboard Manager needs administrator permission to work in admin windows. Elevation failed: $($_.Exception.Message)"
         exit 1

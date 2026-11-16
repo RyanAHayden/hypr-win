@@ -136,25 +136,15 @@ workspaces:
   - name: 'S'
     bind_to_monitor: 0
   - name: '1'
-    bind_to_monitor: 1
   - name: '2'
-    bind_to_monitor: 1
   - name: '3'
-    bind_to_monitor: 1
   - name: '4'
-    bind_to_monitor: 1
   - name: '5'
-    bind_to_monitor: 1
   - name: '6'
-    bind_to_monitor: 1
   - name: '7'
-    bind_to_monitor: 1
   - name: '8'
-    bind_to_monitor: 1
   - name: '9'
-    bind_to_monitor: 1
   - name: '0'
-    bind_to_monitor: 1
 
 window_rules:
   - commands: ['ignore']
@@ -263,7 +253,7 @@ keybindings:
 
   # The hyprwin switcher (hyprwin.cs, WmAction) handles SUPER+Shift+HJKL/arrows, SUPER+\, SUPER+/ and SUPER+Alt+/,
   # SUPER+Shift+Space, SUPER+Shift+O, SUPER+F / SUPER+Alt+F, Alt+Tab (F13/F14), SUPER+Alt+M, SUPER+Shift+W, SUPER+Q,
-  # SUPER+S / SUPER+Alt+S, SUPER+Escape, SUPER+Space and SUPER+Ctrl+V/E itself. They have no GlazeWM binds here: when
+  # SUPER+S / SUPER+Alt+S, SUPER+Escape, SUPER+Space and SUPER+Ctrl+V/E/L itself. They have no GlazeWM binds here: when
   # GlazeWM's keyboard hook runs before hyprwin's (after a config reload), both would fire. keybinds.ps1 lists them.
 
   # Re-evaluate configuration file.

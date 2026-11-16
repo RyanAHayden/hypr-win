@@ -49,6 +49,7 @@ $hyprwin = @(
 	,@('SUPER + SPACE', 'Vicinae launcher (again closes it)', 'vicinae://toggle')
 	,@('SUPER + CTRL + V', 'Vicinae clipboard history', 'vicinae://launch/clipboard/history')
 	,@('SUPER + CTRL + E', 'Vicinae emoji picker', 'vicinae://launch/core/search-emojis')
+	,@('SUPER + CTRL + L', 'Lock the device', 'power-lock.ps1')
 	,@('SUPER + ESC', 'System menu: lock, sleep, hibernate, keep awake, relaunch, log out, restart, shut down', 'powermenu')
 	,@('SUPER + SHIFT + H/J/K/L  /  SUPER + SHIFT + arrows', 'Move window: it splits the next window over (Hyprland-style)', 'move')
 	,@('SUPER + \', 'Flip the split between the focused window and its sibling', 'togglesplit')

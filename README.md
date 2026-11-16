@@ -22,21 +22,22 @@ Install what you want manually or run the included `installs.bat`, which install
 - PowerShell 7 (Microsoft Store build) as the Windows OpenSSH shell; a SYSTEM task follows Store updates at boot and hourly, preserving the no-window launcher when installed. SSH stays managed by `sshd-user`; setup does not enable the `sshd` service
 - PSFzf installed; Windows Terminal set as the default terminal app with PowerShell 7 as its default profile
 - Python `websockets` installed for the GlazeWM focus lock
-- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher and the dwindle tiler. The switcher also moves Start to SUPER+Alt, handles SUPER+C/V, and runs the helper binds (Alt+Tab cycle, SUPER+S/F/Q/\\ and friends, Zebar and focus-lock toggles) on an open GlazeWM connection, so they don't start a process per press. Those binds, SUPER+Space/Ctrl+V/Ctrl+E (Vicinae) and SUPER+Escape (system menu) are only in the switcher: GlazeWM copies would fire as well whenever GlazeWM's keyboard hook runs first (re-run `setup-windows.ps1` after editing it)
+- `hyprwin.exe` built from `.glzr/glazewm/hyprwin.cs` into `~\.glzr\glazewm` with the C# compiler built into Windows. GlazeWM starts it as the SUPER+Tab switcher and the dwindle tiler. The switcher also moves Start to SUPER+Alt, handles SUPER+C/V, and runs the helper binds (Alt+Tab cycle, SUPER+S/F/Q/\\ and friends, Zebar and focus-lock toggles) on an open GlazeWM connection, so they don't start a process per press. Those binds, SUPER+Space/Ctrl+V/Ctrl+E (Vicinae), SUPER+Ctrl+L (lock) and SUPER+Escape (system menu) are only in the switcher: GlazeWM copies would fire as well whenever GlazeWM's keyboard hook runs first (re-run `setup-windows.ps1` after editing it)
 - An elevated, hidden-at-logon scheduled task keeps `sshd.exe` windows and their descendants hidden (asks for administrator permission)
 - Greenshot started at logon and set to region-capture to the clipboard on F22, which hyprwin sends for SUPER+Shift+S (Windows reserves Win+Shift+S for Snipping Tool)
 - An elevated logon task (`PowerToys/Keyboard Manager/ctrl_caps_lock.py`) makes physical Ctrl+Caps Lock toggle Caps Lock, even while Caps Lock is remapped to Ctrl
 - GlazeWM, AltSnap and PowerToys start from logon tasks instead of the Run key (PowerToys and AltSnap run elevated for remapping and dragging admin windows), and Flow Launcher's logon task loses its delay. GlazeWM waits 10 seconds for the desktop to settle and retries failures up to three times at one-minute intervals; GlazeWM, AltSnap, hyprwin and the Keyboard Manager engine run at high CPU priority, Zebar and Flow Launcher above normal; and the hyprwin switcher runs elevated (through a task) so SUPER binds work, and SUPER alone doesn't open Start, over admin windows (asks for administrator permission)
-- A virtual display (`install-virtual-display.ps1`, cloned with the built-in screen) so Sunshine/Moonlight still works with the lid closed; set the lid to "Do nothing" with Flow Launcher's **Toggle Lid Sleep**
+- A virtual display (`install-virtual-display.ps1`, cloned with the built-in screen) so Sunshine/Moonlight still works with the lid closed; set the lid to "Do nothing" with Flow Launcher's **Toggle Lid Sleep**. With the lid closed and an external monitor connected, Windows extends onto it as a separate desktop: choose **Show only on** the external monitor once in Display settings (Windows remembers it for that set of monitors)
 Sign out and back in afterwards for every setting to apply.
 
 # Keys (SUPER = Win)
-GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/Keyboard Manager`), physical left Alt is Win (SUPER), Win is Alt, Caps Lock is Ctrl and Ctrl+H/J/K/L are arrows, so the bottom row reads Ctrl / Alt / SUPER like hypr-mac. Full list: `.glzr/glazewm/config.yaml` (SUPER+I searches it).
+GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/Keyboard Manager`), physical left Alt is Win (SUPER), Win is Alt, Caps Lock is Ctrl and Ctrl+H/J/K/L are arrows, so the bottom row reads Ctrl / Alt / SUPER like hypr-mac. Use **Toggle Keyboard Layout** from Start to switch to the external-keyboard layout (Win is SUPER, Alt stays Alt). Bindings are in `.glzr/glazewm/config.yaml` and the hyprwin switcher (`.glzr/glazewm/hyprwin.cs`); SUPER+I searches both lists.
 
 | Key | Action |
 |---|---|
 | SUPER+I | Key hints: search every keybind (fzf) |
 | SUPER+Alt (tap together) | Start menu (SUPER alone no longer opens it) |
+| SUPER+Ctrl+L | Lock the device. The switcher sets the `DisableLockWorkstation` policy so Win+L stays GlazeWM's focus-right, and lifts it only for this, the system menu and Vicinae's **Power: Lock** (Ctrl+Alt+Del has no Lock while it's on) |
 | SUPER+C / SUPER+V | Copy / paste everywhere, terminals included (sent as Ctrl+Insert / Shift+Insert) |
 | SUPER+Space | Vicinae launcher (again closes it) |
 | SUPER+Ctrl+V / SUPER+Ctrl+E | Vicinae clipboard history / emoji picker |

@@ -794,6 +794,7 @@ static class HyprWin
 				}
 		}) { IsBackground = true }.Start();
 
+		StartLockGuard();
 		mainThread = GetCurrentThreadId();
 		Hook();
 		// AltSnap drags without focusing (focusing mid-drag stops GlazeWM's drag-to-swap), so raise the window instead.
@@ -812,6 +813,66 @@ static class HyprWin
 			}
 		}
 		return 0;
+	}
+
+	// --- Lock guard: SUPER+L is GlazeWM's focus-right, but Windows locks on Win+L before any hook sees it ---
+	// Windows skips Win+L while the DisableLockWorkstation policy is set, which also blocks LockWorkStation. The switcher sets
+	// it (only an elevated process may write it) and clears it just long enough for a lock asked for with SUPER+Ctrl+L or
+	// by signalling the Local\hyprwin-lock event (power-lock.ps1, so Vicinae and the SUPER+Escape menu, does).
+	[DllImport("user32.dll")] static extern bool LockWorkStation();
+	[DllImport("wtsapi32.dll")] static extern bool WTSQuerySessionInformation(IntPtr server, int session, int infoClass, out IntPtr buffer, out int bytes);
+	[DllImport("wtsapi32.dll")] static extern void WTSFreeMemory(IntPtr memory);
+	const string LockPolicyKey = @"Software\Microsoft\Windows\CurrentVersion\Policies\System";
+	static System.Threading.EventWaitHandle lockRequest;
+
+	static void StartLockGuard()
+	{
+		try
+		{
+			var security = new System.Security.AccessControl.EventWaitHandleSecurity();
+			security.AddAccessRule(new System.Security.AccessControl.EventWaitHandleAccessRule(
+				System.Security.Principal.WindowsIdentity.GetCurrent().User,
+				System.Security.AccessControl.EventWaitHandleRights.Modify | System.Security.AccessControl.EventWaitHandleRights.Synchronize,
+				System.Security.AccessControl.AccessControlType.Allow));
+			bool created;
+			lockRequest = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, @"Local\hyprwin-lock", out created, security);
+			SetLockPolicy(true);
+		}
+		catch (Exception) { lockRequest = null; return; }
+		AppDomain.CurrentDomain.ProcessExit += (sender, e) => SetLockPolicy(false);
+		new System.Threading.Thread(() =>
+		{
+			while (lockRequest.WaitOne())
+			{
+				try
+				{
+					SetLockPolicy(false);
+					if (LockWorkStation())
+						for (int i = 0; i < 100 && !SessionLocked(); i++) System.Threading.Thread.Sleep(50);
+				}
+				finally { SetLockPolicy(true); }
+			}
+		}) { IsBackground = true }.Start();
+	}
+
+	static void SetLockPolicy(bool disableLock)
+	{
+		try
+		{
+			using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(LockPolicyKey))
+				key.SetValue("DisableLockWorkstation", disableLock ? 1 : 0, Microsoft.Win32.RegistryValueKind.DWord);
+		}
+		catch (Exception) { }
+	}
+
+	// WTSINFOEX: Level, then WTSINFOEX_LEVEL1 SessionId, SessionState, SessionFlags (WTS_SESSIONSTATE_LOCK = 0).
+	static bool SessionLocked()
+	{
+		IntPtr buffer;
+		int bytes;
+		if (!WTSQuerySessionInformation(IntPtr.Zero, -1, 25 /* WTSSessionInfoEx */, out buffer, out bytes)) return false;
+		try { return Marshal.ReadInt32(buffer, 12) == 0; }
+		finally { WTSFreeMemory(buffer); }
 	}
 
 	delegate void WinEventProc(IntPtr hook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
@@ -930,6 +991,7 @@ static class HyprWin
 			if (shift || alt) return null;
 			if (vk == VK_V) return () => Vicinae("vicinae://launch/clipboard/history?toggle=true");
 			if (vk == VK_E) return () => Vicinae("vicinae://launch/core/search-emojis?toggle=true");
+			if (vk == VK_L) return () => { if (lockRequest != null) lockRequest.Set(); };
 			return null;
 		}
 		switch (vk)
