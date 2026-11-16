@@ -830,9 +830,10 @@ static class HyprWin
 		try
 		{
 			var security = new System.Security.AccessControl.EventWaitHandleSecurity();
+			// A replacement switcher's constructor requests full control if the old event still exists.
 			security.AddAccessRule(new System.Security.AccessControl.EventWaitHandleAccessRule(
 				System.Security.Principal.WindowsIdentity.GetCurrent().User,
-				System.Security.AccessControl.EventWaitHandleRights.Modify | System.Security.AccessControl.EventWaitHandleRights.Synchronize,
+				System.Security.AccessControl.EventWaitHandleRights.FullControl,
 				System.Security.AccessControl.AccessControlType.Allow));
 			bool created;
 			lockRequest = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, @"Local\hyprwin-lock", out created, security);

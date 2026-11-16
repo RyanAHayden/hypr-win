@@ -93,7 +93,7 @@ if exist "%SOURCE_DIR%PowerToys" (
     )
 
     REM Create Start Menu shortcut for toggling keyboard layout
-    powershell -NoProfile -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%APPDATA%\Microsoft\Windows\Start Menu\Programs\Toggle Keyboard Layout.lnk'); $s.TargetPath = '%DEST_DIR%\AppData\Local\Microsoft\PowerToys\Keyboard Manager\toggle_keyboard_layout.bat'; $s.Arguments = ''; $s.IconLocation = '%LOCALAPPDATA%\PowerToys\PowerToys.exe,0'; $s.Description = 'Toggle PowerToys Keyboard Manager Layout'; $s.Save()"
+    powershell -NoProfile -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%APPDATA%\Microsoft\Windows\Start Menu\Programs\Toggle Keyboard Layout.lnk'); $s.TargetPath = '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe'; $s.Arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"%DEST_DIR%\AppData\Local\Microsoft\PowerToys\Keyboard Manager\toggle_keyboard_layout.ps1\"'; $s.IconLocation = '%LOCALAPPDATA%\PowerToys\PowerToys.exe,0'; $s.Description = 'Toggle PowerToys Keyboard Manager Layout'; $s.Save()"
     echo PowerToys Keyboard Manager preferences and Toggle shortcut copied
 ) else (
     echo PowerToys folder not found

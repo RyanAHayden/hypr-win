@@ -96,8 +96,7 @@ if ($isRemapped) {
         Copy-Item $layoutDefault $defaultFile -Force
     } else {
         # Fallback if layout_default.json doesn't exist
-        $fallback = '{"remapKeys":{"inProcess":[]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"18;9","exactMatch":true,"operationType":0,"newRemapKeys":"124"},{"originalKeys":"18;16;9","exactMatch":true,"operationType":0,"newRemapKeys":"125"},{"originalKeys":"91;32","exactMatch":true,"operationType":0,"newRemapKeys":"164;32"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
-            $fallback = '{"remapKeys":{"inProcess":[]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"18;9","exactMatch":true,"operationType":0,"newRemapKeys":"124"},{"originalKeys":"18;16;9","exactMatch":true,"operationType":0,"newRemapKeys":"125"},{"originalKeys":"91;32","exactMatch":true,"operationType":0,"newRemapKeys":"164;32"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
+        $fallback = '{"remapKeys":{"inProcess":[]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"18;9","exactMatch":true,"operationType":0,"newRemapKeys":"124"},{"originalKeys":"18;16;9","exactMatch":true,"operationType":0,"newRemapKeys":"125"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
         Set-Content -Path $defaultFile -Value $fallback -Encoding utf8
     }
     $targetName = "External Keyboard (Win=SUPER)"
@@ -106,8 +105,7 @@ if ($isRemapped) {
         Copy-Item $layoutRemapped $defaultFile -Force
     } else {
         # Fallback if layout_remapped.json doesn't exist
-        $fallback = '{"remapKeys":{"inProcess":[{"originalKeys":"164","newRemapKeys":"91"},{"originalKeys":"20","newRemapKeys":"162"},{"originalKeys":"91","newRemapKeys":"164"}]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"18;9","exactMatch":true,"operationType":0,"newRemapKeys":"124"},{"originalKeys":"18;16;9","exactMatch":true,"operationType":0,"newRemapKeys":"125"},{"originalKeys":"91;32","exactMatch":true,"operationType":0,"newRemapKeys":"164;32"},{"originalKeys":"162;72","exactMatch":false,"newRemapKeys":"37"},{"originalKeys":"162;74","exactMatch":false,"newRemapKeys":"40"},{"originalKeys":"162;75","exactMatch":false,"newRemapKeys":"38"},{"originalKeys":"162;76","exactMatch":false,"newRemapKeys":"39"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
-            $fallback = '{"remapKeys":{"inProcess":[{"originalKeys":"164","newRemapKeys":"91"},{"originalKeys":"20","newRemapKeys":"162"},{"originalKeys":"91","newRemapKeys":"164"}]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"18;9","exactMatch":true,"operationType":0,"newRemapKeys":"124"},{"originalKeys":"18;16;9","exactMatch":true,"operationType":0,"newRemapKeys":"125"},{"originalKeys":"91;32","exactMatch":true,"operationType":0,"newRemapKeys":"164;32"},{"originalKeys":"162;72","exactMatch":false,"newRemapKeys":"37"},{"originalKeys":"162;74","exactMatch":false,"newRemapKeys":"40"},{"originalKeys":"162;75","exactMatch":false,"newRemapKeys":"38"},{"originalKeys":"162;76","exactMatch":false,"newRemapKeys":"39"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
+        $fallback = '{"remapKeys":{"inProcess":[{"originalKeys":"164","newRemapKeys":"91"},{"originalKeys":"20","newRemapKeys":"162"},{"originalKeys":"91","newRemapKeys":"164"}]},"remapKeysToText":{"inProcess":[]},"remapShortcuts":{"global":[{"originalKeys":"18;9","exactMatch":true,"operationType":0,"newRemapKeys":"124"},{"originalKeys":"18;16;9","exactMatch":true,"operationType":0,"newRemapKeys":"125"},{"originalKeys":"162;72","exactMatch":false,"newRemapKeys":"37"},{"originalKeys":"162;74","exactMatch":false,"newRemapKeys":"40"},{"originalKeys":"162;75","exactMatch":false,"newRemapKeys":"38"},{"originalKeys":"162;76","exactMatch":false,"newRemapKeys":"39"}],"appSpecific":[]},"remapShortcutsToText":{"global":[],"appSpecific":[]}}'
         Set-Content -Path $defaultFile -Value $fallback -Encoding utf8
     }
     $targetName = "Laptop (Alt=SUPER, Win=Alt, Caps=Ctrl, Ctrl+HJKL=Arrows)"
@@ -116,17 +114,13 @@ if ($isRemapped) {
 # Restart PowerToys KeyboardManagerEngine to reload configuration immediately
 Restart-KeyboardManager
 
-# Show notification / toast
-try {
-    Add-Type -AssemblyName System.Windows.Forms
-    $notify = New-Object System.Windows.Forms.NotifyIcon
-    $notify.Icon = [System.Drawing.SystemIcons]::Information
-    $notify.BalloonTipTitle = "PowerToys Keyboard Manager"
-    $notify.BalloonTipText = "Switched to: $targetName"
-    $notify.Visible = $true
-    $notify.ShowBalloonTip(2000)
-    Start-Sleep -Milliseconds 800
-    $notify.Dispose()
-} catch {}
+# A hidden script's short-lived tray balloon is unreliable on Windows 11; use a Windows toast.
+[void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+[void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+$toast = New-Object Windows.Data.Xml.Dom.XmlDocument
+$message = [Security.SecurityElement]::Escape("Switched to: $targetName")
+$toast.LoadXml("<toast><visual><binding template='ToastGeneric'><text>PowerToys Keyboard Manager</text><text>$message</text></binding></visual></toast>")
+$powershellAppId = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($powershellAppId).Show([Windows.UI.Notifications.ToastNotification]::new($toast))
 
 Write-Host "Keyboard Manager switched to: $targetName" -ForegroundColor Green
