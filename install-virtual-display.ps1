@@ -1,13 +1,36 @@
 # Installs a virtual display (VirtualDrivers Virtual-Display-Driver) so Sunshine/Moonlight still
-# has a screen to capture when the laptop lid is closed. Windows clones it with the built-in
-# panel, so with the lid open nothing changes. Must run elevated.
+# has a screen to capture when the laptop lid is closed. It stays disabled (so Windows' display
+# modes and SUPER+P work normally); Sunshine turns it on only while a stream runs. Must run elevated.
 $ErrorActionPreference = 'Stop'
 
-$existing = Get-PnpDevice -Class Display -ErrorAction SilentlyContinue |
-	Where-Object { $_.HardwareID -contains 'Root\MttVDD' }
-if ($existing) {
-	if ($existing.Status -ne 'OK') { $existing | Enable-PnpDevice -Confirm:$false }
+function Get-VirtualDisplay {
+	Get-PnpDevice -Class Display -ErrorAction SilentlyContinue |
+		Where-Object { $_.HardwareID -contains 'Root\MttVDD' }
+}
+
+# Sunshine runs prep commands elevated, so the script lives where only administrators can write.
+function Set-SunshineToggle {
+	$toggle = Join-Path $env:ProgramFiles 'hypr-win\virtual-display.ps1'
+	$null = New-Item -ItemType Directory -Path (Split-Path $toggle) -Force
+	Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'virtual-display.ps1') -Destination $toggle -Force
+
+	$conf = Join-Path $env:ProgramFiles 'Sunshine\config\sunshine.conf'
+	if (-not (Test-Path -LiteralPath $conf)) {
+		Write-Host 'Sunshine is not installed; turn the virtual display on with virtual-display.ps1 -State On.'
+	} else {
+		$run = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$toggle`" -State"
+		$prep = ConvertTo-Json -Compress @(@{ do = "$run On"; undo = "$run Off"; elevated = $true })
+		$lines = @(Get-Content -LiteralPath $conf | Where-Object { $_ -notmatch '^\s*global_prep_cmd\s*=' })
+		Set-Content -LiteralPath $conf -Value ($lines + "global_prep_cmd = $prep") -Encoding ascii
+		Restart-Service SunshineService -ErrorAction SilentlyContinue
+		Write-Host 'Sunshine turns the virtual display on while streaming.'
+	}
+	& $toggle -State Off
+}
+
+if (Get-VirtualDisplay) {
 	Write-Host 'Virtual display already installed.'
+	Set-SunshineToggle
 	return
 }
 
@@ -42,3 +65,4 @@ if ($LASTEXITCODE -ne 0) { throw "nefcon could not install the virtual display d
 
 Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host 'Installed virtual display.'
+Set-SunshineToggle

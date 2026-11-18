@@ -27,7 +27,7 @@ Install what you want manually or run the included `installs.bat`, which install
 - Greenshot started at logon and set to region-capture to the clipboard on F22, which hyprwin sends for SUPER+Shift+S (Windows reserves Win+Shift+S for Snipping Tool)
 - An elevated logon task (`PowerToys/Keyboard Manager/ctrl_caps_lock.py`) makes physical Ctrl+Caps Lock toggle Caps Lock, even while Caps Lock is remapped to Ctrl
 - GlazeWM, AltSnap and PowerToys start from logon tasks instead of the Run key (PowerToys and AltSnap run elevated for remapping and dragging admin windows), and Flow Launcher's logon task loses its delay. GlazeWM waits 10 seconds for the desktop to settle and retries failures up to three times at one-minute intervals; GlazeWM, AltSnap, hyprwin and the Keyboard Manager engine run at high CPU priority, Zebar and Flow Launcher above normal; and the hyprwin switcher runs elevated (through a task) so SUPER binds work, and SUPER alone doesn't open Start, over admin windows (asks for administrator permission)
-- A virtual display (`install-virtual-display.ps1`, cloned with the built-in screen) so Sunshine/Moonlight still works with the lid closed; set the lid to "Do nothing" with Flow Launcher's **Toggle Lid Sleep**. With the lid closed and an external monitor connected, Windows extends onto it as a separate desktop: choose **Show only on** the external monitor once in Display settings (Windows remembers it for that set of monitors)
+- A virtual display (`install-virtual-display.ps1`) so Sunshine/Moonlight still works with the lid closed; set the lid to "Do nothing" with Flow Launcher's **Toggle Lid Sleep**. It stays disabled, so Windows' display modes (SUPER+P) only see real monitors; Sunshine's prep command turns it on while a stream runs and off afterwards (`virtual-display.ps1 -State On|Off`, copied to `Program Files\hypr-win`)
 Sign out and back in afterwards for every setting to apply.
 
 # Keys (SUPER = Win)
@@ -64,7 +64,8 @@ GlazeWM's `win` is SUPER. With the PowerToys remapped laptop layout (`PowerToys/
 | SUPER+Shift+Space | Toggle the Zebar bar |
 | SUPER+Shift+O | Toggle focus lock |
 | SUPER+Shift+P | Pause all GlazeWM binds |
-| SUPER+Escape | System menu (centered): lock, sleep, hibernate, keep awake with lid closed, reopen apps at login, relaunch GlazeWM, log out, restart, shut down. Also in Vicinae as "Power: ..." |
+| SUPER+Escape | System menu (centered): lock, sleep, hibernate, keep awake with lid closed, reopen apps at login, laptop keyboard layout (checked when on), relaunch GlazeWM, log out, restart, shut down. Power actions are also in Vicinae as "Power: ..." |
+| SUPER+P | Centered display menu: PC screen only, duplicate, extend, second screen only. Release the shortcut to open; Escape or clicking outside closes it. Uses Windows' display modes without its projection flyout |
 | SUPER+Shift+Enter / B / N / M / F / | Firefox / Edge / VS Code / Spotify / File Explorer / KeePassXC |
 | Alt+Shift+R / W / E | Reload config / redraw / quit GlazeWM |
 
@@ -150,7 +151,7 @@ Set explorer shortcuts like these:
 ## Keyboard bindings in administrator windows
 PowerToys must run as administrator for Keyboard Manager remaps to work in elevated terminals. This config enables **Always run as administrator** and elevated-app warnings. After deploying, use PowerToys Settings > General > **Restart as administrator** once; changing the config does not elevate an already-running process.
 
-The keyboard-layout toggle and GlazeWM startup reload request administrator permission before restarting the remapper, preserving support for admin windows. Accept the UAC prompt; cancelling leaves the current engine/layout unchanged. Only PowerToys and the remapper restart script need elevation, not your normal terminals or other apps.
+The keyboard-layout toggle and GlazeWM startup reload request administrator permission before restarting the remapper, preserving support for admin windows. Accept the UAC prompt; cancelling leaves the current engine/layout unchanged. Only PowerToys and the remapper restart script need elevation, not your normal terminals or other apps. SUPER+Escape also offers **Laptop Keyboard Layout** (K), checked when active, and **Keep Awake With Lid Closed** (C). Zebar shows a centered keyboard icon beside the focus-lock indicator when the laptop layout is active.
 
 ## < [Zen Browser](https://zen-browser.app/) >
 ### Settings

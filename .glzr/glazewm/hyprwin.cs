@@ -17,6 +17,7 @@
 //   hyprwin move left|right|up|down  SUPER+SHIFT+HJKL: split the next window over with the focused one (Hyprland's movewindow)
 //   hyprwin fullscreen [max]  toggle fullscreen (or maximized), returning the window to its old spot
 //   hyprwin powermenu         SUPER+ESC: system menu (lock, sleep, hibernate, keep awake, relaunch, log out, restart, shut down)
+//   hyprwin projectmenu       SUPER+P: centered display projection menu, without the Windows flyout
 //   hyprwin dwindle           stays running (GlazeWM startup): new windows split the focused one along its longer side
 //   hyprwin switcher          stays running (GlazeWM startup): SUPER+Tab window switcher; see the Switcher section.
 //                             It also stops SUPER alone opening Start; tapping SUPER+Alt opens it instead.
@@ -47,7 +48,7 @@ static class HyprWin
 	static int Main(string[] args)
 	{
 		if (args.Length > 0 && args[0] == "switcher") return Switcher();
-		if (args.Length > 0 && args[0] == "powermenu") return PowerMenu();
+		if (args.Length > 0 && (args[0] == "powermenu" || args[0] == "projectmenu")) return RunMenu(args[0]);
 		if (args.Length > 0 && args[0] == "togglezebar") { ToggleZebar(); return 0; }
 		if (args.Length > 0 && args[0] == "focuslock") { ToggleFocusLock(); return 0; }
 		if (args.Length > 0 && args[0] == "scale") { ScaleDisplay(args.Length > 1 && args[1] == "down" ? -1 : 1); return 0; }
@@ -169,16 +170,17 @@ static class HyprWin
 		foreach (var w in bars) ShowWindowAsync(w, show ? 5 : 0);
 	}
 
-	// --- Display scaling: the undocumented DisplayConfig DPI calls Settings > Display uses ---
+	// --- Display configuration ---
+	const int PathSize = 72, ModeSize = 64;
 	[DllImport("user32.dll")] static extern int GetDisplayConfigBufferSizes(uint flags, out uint paths, out uint modes);
-	[DllImport("user32.dll")] static extern int QueryDisplayConfig(uint flags, ref uint paths, byte[] pathArray, ref uint modes, byte[] modeArray, IntPtr topology);
-	[DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo(byte[] packet);
+	[DllImport("user32.dll")] static extern int QueryDisplayConfig(uint flags, ref uint paths, [Out] byte[] pathArray, ref uint modes, [Out] byte[] modeArray, IntPtr topology);
+	[DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo([In, Out] byte[] packet);
 	[DllImport("user32.dll")] static extern int DisplayConfigSetDeviceInfo(byte[] packet);
 	[DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
 	[DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
 	[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetMonitorInfo(IntPtr monitor, byte[] info);
 
-	// Steps the scale of the focused window's monitor through Windows' list (100%, 125%, ...) by one, within its range.
+	// Uses the undocumented DPI calls behind Settings > Display to step the focused monitor's scale.
 	static void ScaleDisplay(int step)
 	{
 		// MONITORINFOEX: cbSize, rcMonitor, rcWork, dwFlags, then the device name (\\.\DISPLAYn) at byte 40.
@@ -188,7 +190,6 @@ static class HyprWin
 		string device = Encoding.Unicode.GetString(monitorInfo, 40, 64).TrimEnd('\0');
 
 		const uint QDC_ONLY_ACTIVE_PATHS = 2;
-		const int PathSize = 72, ModeSize = 64;
 		uint pathCount, modeCount;
 		if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out pathCount, out modeCount) != 0) return;
 		var paths = new byte[pathCount * PathSize];
@@ -625,14 +626,16 @@ static class HyprWin
 	[DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(long point, uint flags);
 	[DllImport("uxtheme.dll", EntryPoint = "#135")] static extern int SetPreferredAppMode(int mode);
 	[DllImport("uxtheme.dll", EntryPoint = "#136")] static extern void FlushMenuThemes();
+	[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int MessageBox(IntPtr hwnd, string text, string caption, uint flags);
 
 	static readonly string[][] PowerItems =
 	{
 		new[] { "&Lock", "power-lock.ps1" },
 		new[] { "&Sleep", "power-sleep.ps1" },
 		new[] { "&Hibernate", "power-hibernate.ps1" },
-		new[] { "&Keep Awake With Lid Closed", "power-lid-sleep.ps1" },
+		new[] { "Keep Awake With Lid &Closed", "power-lid-sleep.ps1" },
 		new[] { "Reopen &Apps at Login", "power-reopen-apps.ps1" },
+		new[] { "Laptop &Keyboard Layout", "toggle_keyboard_layout.ps1" },
 		null,
 		new[] { "Relaunch &Window Manager", "power-relaunch-wm.ps1" },
 		null,
@@ -640,6 +643,60 @@ static class HyprWin
 		new[] { "&Restart", "power-restart.ps1" },
 		new[] { "Shut &Down", "power-shutdown.ps1" },
 	};
+
+	static readonly string[][] ProjectionItems =
+	{
+		new[] { "&PC Screen Only", "/internal" },
+		new[] { "&Duplicate", "/clone" },
+		new[] { "&Extend", "/extend" },
+		new[] { "&Second Screen Only", "/external" },
+	};
+
+	// The virtual display stays disabled except while Sunshine streams (virtual-display.ps1), so Windows' own modes work.
+	static void ProjectDisplay(string mode)
+	{
+		var info = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "DisplaySwitch.exe"), mode)
+			{ UseShellExecute = false, CreateNoWindow = true };
+		using (var process = Process.Start(info))
+		{
+			process.WaitForExit();
+			if (process.ExitCode != 0) throw new InvalidOperationException("DisplaySwitch failed (exit code " + process.ExitCode + ").");
+		}
+	}
+
+	static int RunMenu(string command)
+	{
+		string title = command == "projectmenu" ? "hyprwin projection menu" : "hyprwin power menu";
+		try
+		{
+			bool first;
+			using (new System.Threading.Mutex(true, title, out first))
+			{
+				if (!first)
+				{
+					PostMessage(FindWindow("STATIC", title), 0x001F /* WM_CANCELMODE */, IntPtr.Zero, IntPtr.Zero);
+					return 0;
+				}
+				// Don't let the opening chord (especially a held Win) interfere with the menu's modal input loop.
+				for (int i = 0; SuperHeld() || GetAsyncKeyState(VK_ESCAPE) < 0 || GetAsyncKeyState(VK_P) < 0; i++)
+				{
+					if (i >= 500) return 0;
+					System.Threading.Thread.Sleep(10);
+				}
+				try { SetPreferredAppMode(1); FlushMenuThemes(); } catch (EntryPointNotFoundException) { }
+				if (command != "projectmenu") return PowerMenu();
+				int picked = PickMenu(ProjectionItems, title);
+				if (picked < 0) return 0;
+				ProjectDisplay(ProjectionItems[picked][1]);
+				return 0;
+			}
+		}
+		catch (Exception error)
+		{
+			MessageBox(IntPtr.Zero, error.Message, title, 0x10 /* MB_ICONERROR */);
+			return 1;
+		}
+	}
 
 	// Runs a Vicinae deeplink (https://docs.vicinae.com/deeplinks), as hypr-mac's binds do with raycast:// links.
 	static void Vicinae(string link)
@@ -651,65 +708,86 @@ static class HyprWin
 
 	static int PowerMenu()
 	{
-		bool first;
-		using (new System.Threading.Mutex(true, "hyprwin-powermenu", out first))
+		string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+		while (true)
 		{
-			if (!first) return 0;
-			string scripts = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"vicinae\data\scripts");
-			// Dark menus when Windows is in dark mode.
-			try { SetPreferredAppMode(1); FlushMenuThemes(); } catch (Exception) { }
-			while (true)
-			{
-				string script = PickPower();
-				if (script == null) return 0;
-				RunScript(Path.Combine(scripts, script));
-				if (script != "power-lid-sleep.ps1" && script != "power-reopen-apps.ps1") return 0;
-			}
+			int picked = PickMenu(PowerItems, "hyprwin power menu");
+			if (picked < 0) return 0;
+			string script = PowerItems[picked][1];
+			bool keyboard = script == "toggle_keyboard_layout.ps1";
+			RunScript(Path.Combine(local, keyboard ? @"Microsoft\PowerToys\Keyboard Manager" : @"vicinae\data\scripts", script));
+			if (!keyboard && script != "power-lid-sleep.ps1" && script != "power-reopen-apps.ps1") return 0;
 		}
 	}
 
-	static string PickPower()
+	static bool LaptopKeyboard()
+	{
+		string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+			@"Microsoft\PowerToys\Keyboard Manager\default.json");
+		var layout = Map(json.DeserializeObject(File.ReadAllText(path)));
+		foreach (var entry in List(Map(layout["remapKeys"])["inProcess"]))
+		{
+			var remap = Map(entry);
+			if ("164".Equals(remap["originalKeys"]) && "91".Equals(remap["newRemapKeys"])) return true;
+		}
+		return false;
+	}
+
+	static int PickMenu(string[][] items, string title)
 	{
 		var menu = CreatePopupMenu();
-		const uint MF_STRING = 0, MF_SEPARATOR = 0x800, MF_CHECKED = 8;
-		for (int i = 0; i < PowerItems.Length; i++)
+		if (menu == IntPtr.Zero) throw new InvalidOperationException("Could not create the menu.");
+		IntPtr owner = IntPtr.Zero;
+		try
 		{
-			var item = PowerItems[i];
-			if (item == null) { AppendMenu(menu, MF_SEPARATOR, UIntPtr.Zero, null); continue; }
-			bool on = item[1] == "power-lid-sleep.ps1" ? LidStaysAwake() : item[1] == "power-reopen-apps.ps1" && ReopensApps();
-			AppendMenu(menu, MF_STRING | (on ? MF_CHECKED : 0), (UIntPtr)(i + 1), item[0]);
+			const uint MF_STRING = 0, MF_SEPARATOR = 0x800, MF_CHECKED = 8;
+			for (int i = 0; i < items.Length; i++)
+			{
+				var item = items[i];
+				if (item == null) { AppendMenu(menu, MF_SEPARATOR, UIntPtr.Zero, null); continue; }
+				bool on = item[1] == "power-lid-sleep.ps1" ? LidStaysAwake() :
+					item[1] == "toggle_keyboard_layout.ps1" ? LaptopKeyboard() :
+					item[1] == "power-reopen-apps.ps1" && ReopensApps();
+				AppendMenu(menu, MF_STRING | (on ? MF_CHECKED : 0), (UIntPtr)(i + 1), item[0]);
+			}
+
+			// The center of the work area of the monitor with the mouse (MONITORINFO: rcWork at byte 20).
+			long cursor;
+			if (!GetCursorPos(out cursor)) throw new InvalidOperationException("Could not locate the pointer.");
+			var info = new byte[40];
+			BitConverter.GetBytes(info.Length).CopyTo(info, 0);
+			if (!GetMonitorInfo(MonitorFromPoint(cursor, 2), info)) throw new InvalidOperationException("Could not locate the monitor.");
+			int x = (BitConverter.ToInt32(info, 20) + BitConverter.ToInt32(info, 28)) / 2;
+			int y = (BitConverter.ToInt32(info, 24) + BitConverter.ToInt32(info, 32)) / 2;
+
+			// A visible owner is required for reliable foreground activation and click-away/Escape dismissal.
+			owner = CreateWindowEx(0x80 /* WS_EX_TOOLWINDOW */, "STATIC", title, 0x90000000 /* WS_POPUP | WS_VISIBLE */,
+				x, y, 1, 1, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+			if (owner == IntPtr.Zero) throw new InvalidOperationException("Could not create the menu owner.");
+			Tap(VK_DUMMY);
+			if (!SetForegroundWindow(owner)) throw new InvalidOperationException("Could not focus the menu. Please try the shortcut again.");
+
+			const uint TPM_CENTERALIGN = 0x4, TPM_VCENTERALIGN = 0x10, TPM_NONOTIFY = 0x80, TPM_RETURNCMD = 0x100;
+			int picked = TrackPopupMenuEx(menu, TPM_CENTERALIGN | TPM_VCENTERALIGN | TPM_NONOTIFY | TPM_RETURNCMD, x, y, owner, IntPtr.Zero);
+			PostMessage(owner, 0 /* WM_NULL */, IntPtr.Zero, IntPtr.Zero);
+			return picked - 1;
 		}
-
-		// The menu takes keys only while its owner is the foreground window. A key sent from here makes this process the
-		// last to give input, which lets it take the foreground (PowerToys and the switcher skip keys with our flag).
-		var owner = CreateWindowEx(0x80 /* WS_EX_TOOLWINDOW */, "STATIC", "hyprwin power menu", 0x80000000 /* WS_POPUP */,
-			0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
-		keybd_event(0xFF, 0, 0, new UIntPtr((ulong)OurFlag));
-		keybd_event(0xFF, 0, 2, new UIntPtr((ulong)OurFlag));
-		SetForegroundWindow(owner);
-
-		// The center of the work area of the monitor with the mouse (MONITORINFO: rcWork at byte 20).
-		long cursor;
-		GetCursorPos(out cursor);
-		var info = new byte[40];
-		BitConverter.GetBytes(info.Length).CopyTo(info, 0);
-		GetMonitorInfo(MonitorFromPoint(cursor, 2), info);
-		int x = (BitConverter.ToInt32(info, 20) + BitConverter.ToInt32(info, 28)) / 2;
-		int y = (BitConverter.ToInt32(info, 24) + BitConverter.ToInt32(info, 32)) / 2;
-
-		const uint TPM_CENTERALIGN = 0x4, TPM_VCENTERALIGN = 0x10, TPM_NONOTIFY = 0x80, TPM_RETURNCMD = 0x100;
-		int picked = TrackPopupMenuEx(menu, TPM_CENTERALIGN | TPM_VCENTERALIGN | TPM_NONOTIFY | TPM_RETURNCMD, x, y, owner, IntPtr.Zero);
-		PostMessage(owner, 0 /* WM_NULL */, IntPtr.Zero, IntPtr.Zero);
-		DestroyMenu(menu);
-		DestroyWindow(owner);
-		return picked > 0 ? PowerItems[picked - 1][1] : null;
+		finally
+		{
+			DestroyMenu(menu);
+			if (owner != IntPtr.Zero) DestroyWindow(owner);
+		}
 	}
 
 	static void RunScript(string path)
 	{
 		var info = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + path + "\"")
 			{ CreateNoWindow = true, UseShellExecute = false };
-		using (var process = Process.Start(info)) process.WaitForExit();
+		using (var process = Process.Start(info))
+		{
+			process.WaitForExit();
+			if (process.ExitCode != 0) throw new InvalidOperationException(Path.GetFileName(path) + " failed (exit code " + process.ExitCode + ").");
+		}
 	}
 
 	[DllImport("powrprof.dll")] static extern uint PowerGetActiveScheme(IntPtr rootKey, out IntPtr scheme);
@@ -757,7 +835,7 @@ static class HyprWin
 
 	const int VK_TAB = 0x09, VK_SHIFT = 0x10, VK_ESCAPE = 0x1B, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28, VK_DELETE = 0x2E;
 	const int VK_H = 0x48, VK_J = 0x4A, VK_K = 0x4B, VK_L = 0x4C, VK_Q = 0x51, VK_C = 0x43, VK_V = 0x56, VK_F = 0x46, VK_E = 0x45, VK_INSERT = 0x2D;
-	const int VK_W = 0x57, VK_M = 0x4D, VK_S = 0x53, VK_O = 0x4F, VK_SPACE = 0x20, VK_BACKSLASH = 0xDC, VK_SLASH = 0xBF, VK_F13 = 0x7C, VK_F14 = 0x7D, VK_F22 = 0x85;
+	const int VK_W = 0x57, VK_M = 0x4D, VK_S = 0x53, VK_O = 0x4F, VK_P = 0x50, VK_SPACE = 0x20, VK_BACKSLASH = 0xDC, VK_SLASH = 0xBF, VK_F13 = 0x7C, VK_F14 = 0x7D, VK_F22 = 0x85;
 	const int VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3;
 	const int VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_MENU = 0x12, VK_LMENU = 0xA4, VK_RMENU = 0xA5, VK_DUMMY = 0xFF;
 	const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2, WM_APP = 0x8000, WM_MODIFIER_DOWN = WM_APP + 1;
@@ -1015,6 +1093,8 @@ static class HyprWin
 			// Its own process, so the menu's modal loop never blocks this hook; GlazeWM fires its bind only on release.
 			case VK_ESCAPE: return shift || alt ? null : (Action)(() => Process.Start(new ProcessStartInfo(
 				Process.GetCurrentProcess().MainModule.FileName, "powermenu") { UseShellExecute = false }).Dispose());
+			case VK_P: return shift || alt ? null : (Action)(() => Process.Start(new ProcessStartInfo(
+				Process.GetCurrentProcess().MainModule.FileName, "projectmenu") { UseShellExecute = false }).Dispose());
 		}
 		return null;
 	}
