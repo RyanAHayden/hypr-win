@@ -71,6 +71,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
 }
 
 /* Right section */
@@ -82,15 +83,23 @@ body,
   justify-content: flex-end;
 }
 
-.focus-lock {
+.focus-lock,
+.keyboard-layout {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   width: 18px;
   height: var(--bar-item-height);
-  color: #ff4d4f;
   font-size: 14px;
+}
+
+.focus-lock {
+  color: #ff4d4f;
+}
+
+.keyboard-layout {
+  color: var(--cyan);
 }
 
 /* Workspaces */

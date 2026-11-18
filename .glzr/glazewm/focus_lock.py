@@ -2,6 +2,8 @@ import argparse
 import asyncio
 import ctypes
 import json
+import logging
+import os
 import shutil
 import subprocess
 import time
@@ -16,6 +18,7 @@ STOP_PATH = STATE_PATH.with_suffix(".stop")
 IPC_URL = "ws://127.0.0.1:6123"
 STATUS_HOST = "127.0.0.1"
 STATUS_PORT = 6125
+KEYBOARD_LAYOUT_PATH = Path(os.environ["LOCALAPPDATA"]) / "Microsoft" / "PowerToys" / "Keyboard Manager" / "default.json"
 # GlazeWM's raw-input listener ignores input tagged with its own marker.
 GLAZEWM_INPUT_MARKER = 6379
 # How long after a window opens its focus is treated as stealing.
@@ -296,6 +299,19 @@ async def run_ipc(stop_event):
             await asyncio.sleep(1)
 
 
+def laptop_keyboard():
+    try:
+        layout = json.loads(KEYBOARD_LAYOUT_PATH.read_text(encoding="utf-8-sig"))
+        remaps = layout["remapKeys"]["inProcess"]
+        return any(
+            remap["originalKeys"] == "164" and remap["newRemapKeys"] == "91"
+            for remap in remaps
+        )
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        logging.warning("Could not read the active keyboard layout: %s", error)
+        return None
+
+
 async def serve_status(reader, writer):
     try:
         request = await reader.readline()
@@ -309,7 +325,10 @@ async def serve_status(reader, writer):
             body = b""
         elif request.startswith((b"GET /status ", b"POST /status ")):
             status = b"200 OK"
-            body = json.dumps({"locked": read_state().get("locked", False)}).encode()
+            body = json.dumps({
+                "locked": read_state().get("locked", False),
+                "laptopKeyboard": laptop_keyboard(),
+            }).encode()
         else:
             status = b"404 Not Found"
             body = b"{}"

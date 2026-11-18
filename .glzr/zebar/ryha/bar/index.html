@@ -299,6 +299,7 @@
       function App() {
         const output = useProviderOutput(providers);
         const [focusLocked, setFocusLocked] = useState(false);
+        const [laptopKeyboard, setLaptopKeyboard] = useState(false);
 
         useEffect(() => {
           let disposed = false;
@@ -311,11 +312,17 @@
                 cache: 'no-store',
                 signal: AbortSignal.timeout(1500),
               });
-              if (!response.ok) throw new Error('Focus-lock status unavailable');
+              if (!response.ok) throw new Error('Desktop status unavailable');
               const status = await response.json();
-              if (!disposed) setFocusLocked(status.locked === true);
+              if (!disposed) {
+                setFocusLocked(status.locked === true);
+                setLaptopKeyboard(status.laptopKeyboard === true);
+              }
             } catch {
-              if (!disposed) setFocusLocked(false);
+              if (!disposed) {
+                setFocusLocked(false);
+                setLaptopKeyboard(false);
+              }
             } finally {
               if (!disposed) timer = setTimeout(pollStatus, 500);
             }
@@ -337,6 +344,12 @@
             </div>
 
             <div className="center">
+              {laptopKeyboard && (
+                <span className="keyboard-layout" role="img" aria-label="Laptop keyboard layout active"
+                  title="Laptop keyboard layout: Alt=SUPER, Win=Alt, Caps=Ctrl">
+                  {'\uf11c'}
+                </span>
+              )}
               {focusLocked && (
                 <span className="focus-lock" role="img" aria-label="Focus lock active" title="Focus lock active">
                   {'\uf023'}
