@@ -117,7 +117,7 @@ Write-Host 'Raised the CPU priority of GlazeWM, AltSnap, hyprwin, Keyboard Manag
 # A normal process's keyboard hook and keys don't reach elevated windows, so SUPER opened Start over them.
 # `hyprwin.exe switcher` (started by GlazeWM) hands over to this elevated copy. It's built into Program Files, which only
 # administrators can write to: an elevated task any process can start must not run a file any process can replace.
-# Re-run this script after editing hyprwin.cs to update the elevated copy.
+# Run update-hyprwin.ps1 (or this script) after editing hyprwin.cs to update the elevated copy.
 $elevatedDir = Join-Path $env:ProgramFiles 'hypr-win'
 $elevatedHyprwin = Join-Path $elevatedDir 'hyprwin.exe'
 $null = New-Item -ItemType Directory -Path $elevatedDir -Force

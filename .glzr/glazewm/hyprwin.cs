@@ -1,7 +1,8 @@
 // hyprwin.exe: fast GlazeWM helpers (hypr-mac's window-cycle, quit-app, force-kill-window, scratchpad, unminimize).
 // Talks to GlazeWM's IPC websocket directly; ~60 ms per key press instead of ~650 ms for a PowerShell script.
-// Built by setup-windows.ps1 with the .NET Framework csc.exe that ships with Windows:
+// Built by setup-windows.ps1 (or update-hyprwin.ps1 after an edit) with the .NET Framework csc.exe that ships with Windows:
 //   csc /nologo /target:winexe /r:System.Web.Extensions.dll /out:%USERPROFILE%\.glzr\glazewm\hyprwin.exe hyprwin.cs
+// Failures are logged to %LOCALAPPDATA%\hypr-win\hyprwin.log.
 // Usage:
 //   hyprwin cycle next|prev   ALT+TAB / ALT+SHIFT+TAB: focus the next/previous window on this workspace (not minimized)
 //   hyprwin quit              SUPER+Q: close every window of the focused window's app (it can still ask to save)
@@ -45,8 +46,35 @@ static class HyprWin
 	static NetworkStream stream;
 	static readonly JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
 
+	// Failures that would otherwise pass silently (a dropped hook, GlazeWM errors, crashes) go to
+	// %LOCALAPPDATA%\hypr-win\hyprwin.log, kept under 1 MB (the previous one is hyprwin.log.1). Never call this from
+	// the keyboard hook's callback: a slow disk there would get the hook removed.
+	static readonly object logLock = new object();
+
+	static void Log(string text)
+	{
+		try
+		{
+			lock (logLock)
+			{
+				var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "hypr-win");
+				Directory.CreateDirectory(dir);
+				var path = Path.Combine(dir, "hyprwin.log");
+				if (File.Exists(path) && new FileInfo(path).Length > 1 << 20)
+				{
+					File.Delete(path + ".1");
+					File.Move(path, path + ".1");
+				}
+				File.AppendAllText(path, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + " [" + Process.GetCurrentProcess().Id + "] " + text + "\r\n");
+			}
+		}
+		catch (Exception) { }
+	}
+
 	static int Main(string[] args)
 	{
+		AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+			Log("crashed (" + string.Join(" ", args) + "): " + e.ExceptionObject);
 		if (args.Length > 0 && args[0] == "switcher") return Switcher();
 		if (args.Length > 0 && (args[0] == "powermenu" || args[0] == "projectmenu")) return RunMenu(args[0]);
 		if (args.Length > 0 && args[0] == "togglezebar") { ToggleZebar(); return 0; }
@@ -82,7 +110,12 @@ static class HyprWin
 			}
 			return 0;
 		}
-		catch (Exception) { return 1; }
+		catch (Exception error)
+		{
+			// The long-running dwindle ends here when GlazeWM exits; a one-off command fails with it not running.
+			Log((args.Length > 0 ? args[0] : "(no command)") + " failed: " + error.GetType().Name + ": " + error.Message);
+			return 1;
+		}
 	}
 
 	static void Connect()
@@ -605,7 +638,7 @@ static class HyprWin
 		try { if (!instance.WaitOne(3000)) return false; }
 		catch (System.Threading.AbandonedMutexException) { }
 		quit.Reset();
-		new System.Threading.Thread(() => { quit.WaitOne(); Environment.Exit(0); }) { IsBackground = true }.Start();
+		new System.Threading.Thread(() => { quit.WaitOne(); Log(name + ": replaced by a new instance"); Environment.Exit(0); }) { IsBackground = true }.Start();
 		return true;
 	}
 
@@ -693,6 +726,7 @@ static class HyprWin
 		}
 		catch (Exception error)
 		{
+			Log(title + " failed: " + error);
 			MessageBox(IntPtr.Zero, error.Message, title, 0x10 /* MB_ICONERROR */);
 			return 1;
 		}
@@ -856,7 +890,7 @@ static class HyprWin
 	// It's a low-level keyboard hook rather than a PowerToys remap: PowerToys releases Alt on any other key, closing the switcher.
 
 	delegate IntPtr KeyboardProc(int code, IntPtr message, IntPtr data);
-	[DllImport("user32.dll")] static extern IntPtr SetWindowsHookEx(int id, KeyboardProc proc, IntPtr module, uint thread);
+	[DllImport("user32.dll", SetLastError = true)] static extern IntPtr SetWindowsHookEx(int id, KeyboardProc proc, IntPtr module, uint thread);
 	[DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hook);
 	[DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
 	[DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
@@ -891,7 +925,8 @@ static class HyprWin
 		// A normal process's hook and keys don't reach elevated windows (so SUPER opened Start over them): hand over to the
 		// elevated copy setup-elevated-windows.ps1 registers, if there is one.
 		if (!IsElevated() && RunTask("Ryha hyprwin switcher")) return 0;
-		if (!TakeOver("hyprwin-switcher")) return 1;
+		if (!TakeOver("hyprwin-switcher")) { Log("switcher: the running switcher didn't exit, giving up"); return 1; }
+		Log("switcher started" + (IsElevated() ? " (elevated)" : ""));
 
 		// GlazeWM commands from the hook run here, on one connection kept open (reconnecting if GlazeWM restarted).
 		new System.Threading.Thread(() =>
@@ -913,9 +948,15 @@ static class HyprWin
 						stream = null;
 						// GlazeWM got the command but didn't answer in time: running it again could toggle something twice.
 						var socket = e.InnerException as SocketException;
-						if (socket != null && socket.SocketErrorCode == SocketError.TimedOut) break;
+						bool timedOut = socket != null && socket.SocketErrorCode == SocketError.TimedOut;
+						if (timedOut || attempt == 1) Log("switcher: GlazeWM command failed" + (timedOut ? " (no reply in 3 s)" : "") + ": " + e.Message);
+						if (timedOut) break;
 					}
-					catch (Exception) { stream = null; }
+					catch (Exception e)
+					{
+						stream = null;
+						if (attempt == 1) Log("switcher: GlazeWM command failed: " + e.GetType().Name + ": " + e.Message);
+					}
 				}
 		}) { IsBackground = true }.Start();
 
@@ -963,7 +1004,10 @@ static class HyprWin
 				int now = Environment.TickCount;
 				bool locked = SessionLocked();
 				// The tick count keeps counting through sleep, so a long gap means the machine was asleep.
-				if (now - last > 6000 || (wasLocked && !locked) || now - lastHook > 30000)
+				bool resumed = now - last > 6000, unlocked = wasLocked && !locked;
+				if (resumed) Log("switcher: re-hooking after " + (now - last) / 1000 + " s asleep or stalled");
+				if (unlocked) Log("switcher: re-hooking after unlock");
+				if (resumed || unlocked || now - lastHook > 30000)
 				{
 					PostThreadMessage(mainThread, WM_REHOOK, IntPtr.Zero, IntPtr.Zero);
 					lastHook = now;
@@ -1070,7 +1114,11 @@ static class HyprWin
 		const int WH_KEYBOARD_LL = 13;
 		var old = keyboardHook;
 		keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, keyboardProc, GetModuleHandle(null), 0);
-		if (keyboardHook == IntPtr.Zero) keyboardHook = old;
+		if (keyboardHook == IntPtr.Zero)
+		{
+			keyboardHook = old;
+			Log("switcher: installing the keyboard hook failed (error " + Marshal.GetLastWin32Error() + ")");
+		}
 		else if (old != IntPtr.Zero) UnhookWindowsHookEx(old);
 	}
 
