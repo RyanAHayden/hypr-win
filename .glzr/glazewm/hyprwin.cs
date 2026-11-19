@@ -764,8 +764,7 @@ static class HyprWin
 			owner = CreateWindowEx(0x80 /* WS_EX_TOOLWINDOW */, "STATIC", title, 0x90000000 /* WS_POPUP | WS_VISIBLE */,
 				x, y, 1, 1, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
 			if (owner == IntPtr.Zero) throw new InvalidOperationException("Could not create the menu owner.");
-			Tap(VK_DUMMY);
-			if (!SetForegroundWindow(owner)) throw new InvalidOperationException("Could not focus the menu. Please try the shortcut again.");
+			if (!ForceForeground(owner)) throw new InvalidOperationException("Could not focus the menu. Please try the shortcut again.");
 
 			const uint TPM_CENTERALIGN = 0x4, TPM_VCENTERALIGN = 0x10, TPM_NONOTIFY = 0x80, TPM_RETURNCMD = 0x100;
 			int picked = TrackPopupMenuEx(menu, TPM_CENTERALIGN | TPM_VCENTERALIGN | TPM_NONOTIFY | TPM_RETURNCMD, x, y, owner, IntPtr.Zero);
@@ -777,6 +776,42 @@ static class HyprWin
 			DestroyMenu(menu);
 			if (owner != IntPtr.Zero) DestroyWindow(owner);
 		}
+	}
+
+	[DllImport("user32.dll")] static extern bool AttachThreadInput(uint attach, uint attachTo, bool on);
+	[DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hwnd);
+
+	// Windows refuses SetForegroundWindow from a process that didn't get the last input (the foreground lock), so one try
+	// often failed. Joining the foreground thread's input queue for the call lifts that lock; retry while it settles.
+	static bool ForceForeground(IntPtr hwnd)
+	{
+		uint self = GetCurrentThreadId();
+		for (int attempt = 0; attempt < 25; attempt++)
+		{
+			IntPtr foreground = GetForegroundWindow();
+			if (foreground == hwnd) return true;
+			uint pid, thread = foreground == IntPtr.Zero ? 0 : GetWindowThreadProcessId(foreground, out pid);
+			bool attached = thread != 0 && thread != self && AttachThreadInput(self, thread, true);
+			try
+			{
+				Tap(VK_DUMMY);
+				BringWindowToTop(hwnd);
+				SetForegroundWindow(hwnd);
+			}
+			finally { if (attached) AttachThreadInput(self, thread, false); }
+			if (GetForegroundWindow() == hwnd) return true;
+			System.Threading.Thread.Sleep(20);
+		}
+		return false;
+	}
+
+	// SUPER+Escape / SUPER+P from the switcher: a thread here rather than a new process (no startup or JIT per press).
+	// The menu's modal loop runs on that thread, so it never blocks the keyboard hook.
+	static void StartMenu(string command)
+	{
+		var thread = new System.Threading.Thread(() => RunMenu(command)) { IsBackground = true };
+		thread.SetApartmentState(System.Threading.ApartmentState.STA);
+		thread.Start();
 	}
 
 	static void RunScript(string path)
@@ -862,35 +897,81 @@ static class HyprWin
 		new System.Threading.Thread(() =>
 		{
 			// Connect and run the JSON code once now, so the first key press doesn't pay for it (~150 ms).
-			try { Connect(); FocusedWorkspace(); PathTo(""); }
+			try { Connect(); stream.ReadTimeout = stream.WriteTimeout = 3000; FocusedWorkspace(); PathTo(""); }
 			catch (Exception) { stream = null; }
 			foreach (var job in jobs.GetConsumingEnumerable())
 				for (int attempt = 0; attempt < 2; attempt++)
 				{
-					try { if (stream == null) Connect(); job(); break; }
+					try
+					{
+						if (stream == null) { Connect(); stream.ReadTimeout = stream.WriteTimeout = 3000; }
+						job();
+						break;
+					}
+					catch (System.IO.IOException e)
+					{
+						stream = null;
+						// GlazeWM got the command but didn't answer in time: running it again could toggle something twice.
+						var socket = e.InnerException as SocketException;
+						if (socket != null && socket.SocketErrorCode == SocketError.TimedOut) break;
+					}
 					catch (Exception) { stream = null; }
 				}
 		}) { IsBackground = true }.Start();
 
 		StartLockGuard();
+		StartMoveRaiser();
 		mainThread = GetCurrentThreadId();
 		Hook();
-		// AltSnap drags without focusing (focusing mid-drag stops GlazeWM's drag-to-swap), so raise the window instead.
-		// Raising without activating isn't a focus change, so GlazeWM leaves the drag alone.
-		const uint EVENT_SYSTEM_MOVESIZESTART = 0x000A, WINEVENT_OUTOFCONTEXT = 0, WINEVENT_SKIPOWNPROCESS = 2;
-		SetWinEventHook(EVENT_SYSTEM_MOVESIZESTART, EVENT_SYSTEM_MOVESIZESTART, IntPtr.Zero, moveStartProc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+		StartHookWatch();
+		// This thread runs the keyboard hook and must never block: Windows silently removes a low-level hook whose callback
+		// is ever too slow, leaving every bind here dead. So it only handles the hook and these quick messages.
 		MSG msg;
+		UIntPtr modifierTimer = UIntPtr.Zero;
+		int modifierSeq = 0;
 		while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0)
 		{
 			if (msg.message == WM_APP) Hook();
+			else if (msg.message == WM_REHOOK) { if (!active) Hook(); }
 			else if (msg.message == WM_MODIFIER_DOWN)
 			{
 				// Check the system's key state once the key has reached it (PowerToys may have swapped Alt and Win).
-				System.Threading.Thread.Sleep(10);
-				if (!chordHeld && (int)msg.wParam == keySeq && SuperHeld() && AltHeld()) chordHeld = chordClean = true;
+				if (modifierTimer != UIntPtr.Zero) KillTimer(IntPtr.Zero, modifierTimer);
+				modifierSeq = (int)msg.wParam;
+				modifierTimer = SetTimer(IntPtr.Zero, UIntPtr.Zero, 10, IntPtr.Zero);
+			}
+			else if (msg.message == WM_TIMER && msg.wParam == (IntPtr)(long)(ulong)modifierTimer && modifierTimer != UIntPtr.Zero)
+			{
+				KillTimer(IntPtr.Zero, modifierTimer);
+				modifierTimer = UIntPtr.Zero;
+				if (!chordHeld && modifierSeq == keySeq && SuperHeld() && AltHeld()) chordHeld = chordClean = true;
 			}
 		}
 		return 0;
+	}
+
+	// Re-hooks after sleep/resume and unlock (when Windows is likeliest to have dropped the hook), and every 30 s as a backstop.
+	static void StartHookWatch()
+	{
+		new System.Threading.Thread(() =>
+		{
+			int last = Environment.TickCount, lastHook = last;
+			bool wasLocked = false;
+			while (true)
+			{
+				System.Threading.Thread.Sleep(2000);
+				int now = Environment.TickCount;
+				bool locked = SessionLocked();
+				// The tick count keeps counting through sleep, so a long gap means the machine was asleep.
+				if (now - last > 6000 || (wasLocked && !locked) || now - lastHook > 30000)
+				{
+					PostThreadMessage(mainThread, WM_REHOOK, IntPtr.Zero, IntPtr.Zero);
+					lastHook = now;
+				}
+				last = now;
+				wasLocked = locked;
+			}
+		}) { IsBackground = true }.Start();
 	}
 
 	// --- Lock guard: SUPER+L is GlazeWM's focus-right, but Windows locks on Win+L before any hook sees it ---
@@ -959,21 +1040,43 @@ static class HyprWin
 	[DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 	static readonly WinEventProc moveStartProc = OnMoveStart;
 
+	// AltSnap drags without focusing (focusing mid-drag stops GlazeWM's drag-to-swap), so raise the window instead.
+	// Raising without activating isn't a focus change, so GlazeWM leaves the drag alone. This runs on its own thread, away
+	// from the keyboard hook.
+	static void StartMoveRaiser()
+	{
+		new System.Threading.Thread(() =>
+		{
+			const uint EVENT_SYSTEM_MOVESIZESTART = 0x000A, WINEVENT_OUTOFCONTEXT = 0, WINEVENT_SKIPOWNPROCESS = 2;
+			SetWinEventHook(EVENT_SYSTEM_MOVESIZESTART, EVENT_SYSTEM_MOVESIZESTART, IntPtr.Zero, moveStartProc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+			MSG msg;
+			while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0) { }
+		}) { IsBackground = true }.Start();
+	}
+
 	static void OnMoveStart(IntPtr hook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
 	{
-		const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10, SWP_NOOWNERZORDER = 0x200;
+		// Async, so a hung window can't stall this thread.
+		const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10, SWP_NOOWNERZORDER = 0x200, SWP_ASYNCWINDOWPOS = 0x4000;
 		if (idObject == 0 && hwnd != IntPtr.Zero)
-			SetWindowPos(hwnd, IntPtr.Zero /* HWND_TOP */, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+			SetWindowPos(hwnd, IntPtr.Zero /* HWND_TOP */, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS);
 	}
 
 	static void Hook()
 	{
 		// The newest low-level hook runs first. Re-hook each time the switcher opens so Shift/Tab/Q/HJKL reach this hook
 		// before PowerToys (which re-hooks when its layout reloads) turns them into its own shortcuts.
-		if (keyboardHook != IntPtr.Zero) UnhookWindowsHookEx(keyboardHook);
+		// Install the new hook before removing the old one, so no key slips past in between.
 		const int WH_KEYBOARD_LL = 13;
+		var old = keyboardHook;
 		keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, keyboardProc, GetModuleHandle(null), 0);
+		if (keyboardHook == IntPtr.Zero) keyboardHook = old;
+		else if (old != IntPtr.Zero) UnhookWindowsHookEx(old);
 	}
+
+	[DllImport("user32.dll")] static extern UIntPtr SetTimer(IntPtr hwnd, UIntPtr id, uint milliseconds, IntPtr callback);
+	[DllImport("user32.dll")] static extern bool KillTimer(IntPtr hwnd, UIntPtr id);
+	const uint WM_TIMER = 0x0113, WM_REHOOK = WM_APP + 2;
 
 	static IntPtr OnKey(int code, IntPtr message, IntPtr data)
 	{
@@ -1054,7 +1157,9 @@ static class HyprWin
 		var action = WmAction(vk);
 		if (action == null) return false;
 		wmKey = vk;
-		jobs.Add(action);
+		// The menus don't need GlazeWM, so they open at once rather than waiting behind its commands.
+		if (vk == VK_ESCAPE || vk == VK_P) action();
+		else jobs.Add(action);
 		return true;
 	}
 
@@ -1090,11 +1195,9 @@ static class HyprWin
 			case VK_SPACE: return alt ? null : shift ? (Action)ToggleZebar : () => Vicinae("vicinae://toggle");
 			case VK_O: return shift && !alt ? (Action)ToggleFocusLock : null;
 			case VK_SLASH: return shift ? null : alt ? (Action)(() => ScaleDisplay(-1)) : () => ScaleDisplay(1);
-			// Its own process, so the menu's modal loop never blocks this hook; GlazeWM fires its bind only on release.
-			case VK_ESCAPE: return shift || alt ? null : (Action)(() => Process.Start(new ProcessStartInfo(
-				Process.GetCurrentProcess().MainModule.FileName, "powermenu") { UseShellExecute = false }).Dispose());
-			case VK_P: return shift || alt ? null : (Action)(() => Process.Start(new ProcessStartInfo(
-				Process.GetCurrentProcess().MainModule.FileName, "projectmenu") { UseShellExecute = false }).Dispose());
+			// The menu runs on its own thread (StartMenu); GlazeWM fires its bind only on release.
+			case VK_ESCAPE: return shift || alt ? null : (Action)(() => StartMenu("powermenu"));
+			case VK_P: return shift || alt ? null : (Action)(() => StartMenu("projectmenu"));
 		}
 		return null;
 	}
